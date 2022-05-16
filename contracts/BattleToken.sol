@@ -51,6 +51,8 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
 
     event AddContract(uint256 indexed id, NFTContract nft);
 
+    event CollectTokenFailure(uint256 contractId_, string memory reason);
+
     constructor() ERC20Immobile("PixelHeroesBattleToken", "PHBT") public {
         // AccessControlのロール付与。Deployerに各権限を付与する。
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -65,10 +67,32 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
 
     //後で実装する
     function balanceOf(address account) public view  virtual override returns (uint256) {
-        
+        address addr;
+        uint256 amount = 0;
+        uint256 tokenCount;
+        for (uint i = 0; i < _inChainsId.length; i++){
+            addr = _contractInfo[_inChainsId[i]].addr;
+            try IERC721(addr).supportsInterfaceId(bytes4(keccak256('tokenOfOwnerByIndex(address,uint256)'))) 
+                returns (bool retval)
+            {
+                //tokenOfOwnerByIndexがある場合はトークン数を収集する
+                if (retval){
+                    tokenCount = IERC721(addr).balanceOf(account);
+                    for (uint j = 0; j < tokenCount; j++){
+                        amount += _balances[ _inChainsId[i] ][j];
+                    }
+                }
+
+            }catch Error (string memory reason) {
+                emit CollectTokenFailure(_inChainsId[i], reason);
+            }catch (bytes memory reason) {
+                emit CollectTokenFailure(_inChainsId[i], "low level error was occured.");
+            }
+        }
     }
-    // コントラクトIDリスト関連
-    function addContract(address addr_, uint256 chainid_) public virtual onlyRole(DEFAULT_ADMIN_ROLE){
+    
+    // コントラクトID登録
+    function addContract(address addr_, uint256 chainid_) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
         NFTContract memory newContract = NFTContract({
             addr: addr_,
             chainid : chainid_
@@ -80,11 +104,12 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
         // コントラクトが未登録であることを確認する
         require(contractId(addr_, chainid_) == 0, 'cannot add contract : contract already exists');
         // 内部登録処理を起動
-        _addContract(newContract);
+        return _addContract(newContract);
 
     }
 
-    function _addContract(NFTContract memory contract_) internal virtual {
+    // コントラクトID登録(内部関数)
+    function _addContract(NFTContract memory contract_) internal virtual returns(uint256) {
         uint256 newId = _contractCount + 1;
         // コントラクトIDを登録する
         _contractId[contract_.addr][contract_.chainId]= newId;
@@ -100,6 +125,13 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
         _contractCount += 1;
         //イベント送信
         emit AddContract(newId, contract_);
+        //戻り値を返す
+        return newId;
+    }
+
+    // 登録コントラクトの有効/無効設定
+    function setAvailablity(uint256 contractId_, bool val_) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        _availability[contractId_] = val_;
     }
 
     // ゲッター関数

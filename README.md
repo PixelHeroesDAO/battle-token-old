@@ -1,4 +1,4 @@
-# Pixel Heroes Battel Token
+# Pixel Heroes Battle Token
 
 ## 概要
 - ERC20とことなりNFTコントラクトアドレス×チェーンID×トークンIDにトークンを付与・償還する。

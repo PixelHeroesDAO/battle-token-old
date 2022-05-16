@@ -32,7 +32,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  * 
- * CHANGE:
+ * CHANGE in ERC20Immobile.sol:
  *   derived for immobile ERC20 Abstract contract.
  */
 abstract contract ERC20Immobile is Context, IERC20, IERC20Metadata {
@@ -177,7 +177,7 @@ abstract contract ERC20Immobile is Context, IERC20, IERC20Metadata {
     /**
      * @dev Moves `amount` of tokens from `from` to `to`.
      *
-     * Implementation of ERC20 was eliminated and always false.
+     * Implementation of ERC20 was eliminated.
      
     function _transfer(
         address from,

@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "./ERC20Immobile.sol";
@@ -11,8 +12,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "hardhat/console.sol";
 
-constract BattelToken is ERC20Immobile, Pausable, AccessControl {
-
+contract BattelToken is ERC20Immobile, Pausable, AccessControl {
 
     struct NFTContract{
         address addr;
@@ -28,7 +28,7 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
     // 同一チェーンのContractIdリスト
     uint256[] _inChainsId;
     // 登録済みコントラクト数
-    uint256 private _contractsCount;  //=0
+    uint256 private _totalContracts;  //=0
     // コントラクトのトークン更新有効性([ContractId])
     mapping(uint256 => bool) private _availablity;
     // トークン残高([ContractId][TokenId])
@@ -40,7 +40,7 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
     uint256 public immutable chainid = block.chainid;
     //ERC20向け
     uint256 private _totalSupply;
-
+    
     // AccessControl関係
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -51,8 +51,6 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
 
     event AddContract(uint256 indexed id, NFTContract nft);
 
-    event CollectTokenFailure(uint256 contractId_, string memory reason);
-
     constructor() ERC20Immobile("PixelHeroesBattleToken", "PHBT") public {
         // AccessControlのロール付与。Deployerに各権限を付与する。
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -60,19 +58,20 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
         _grantRole(MINTER_ROLE, msg.sender);
     }
 
-    function totalSupply() public override virtual returns(uint256){
+    function totalSupply() public view virtual override returns(uint256){
         return _totalSupply;
         console.log('totalSupply : ',_totalSupply);
     }
 
-    //後で実装する
+    //同一チェーンかつtokenOfOwnerByIndexのあるコントラクトについて、トークン数を収集する
     function balanceOf(address account) public view  virtual override returns (uint256) {
         address addr;
         uint256 amount = 0;
         uint256 tokenCount;
+        require(account != address(0), "address zero is not a valid owner");
         for (uint i = 0; i < _inChainsId.length; i++){
             addr = _contractInfo[_inChainsId[i]].addr;
-            try IERC721(addr).supportsInterfaceId(bytes4(keccak256('tokenOfOwnerByIndex(address,uint256)'))) 
+            try IERC721Enumerable(addr).supportsInterface(bytes4(keccak256('tokenOfOwnerByIndex(address,uint256)'))) 
                 returns (bool retval)
             {
                 //tokenOfOwnerByIndexがある場合はトークン数を収集する
@@ -84,25 +83,26 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
                 }
 
             }catch Error (string memory reason) {
-                emit CollectTokenFailure(_inChainsId[i], reason);
+                console.log(_inChainsId[i], reason);
             }catch (bytes memory reason) {
-                emit CollectTokenFailure(_inChainsId[i], "low level error was occured.");
+                console.log(_inChainsId[i], "low level error was occured.");
             }
         }
+        return amount;
     }
     
     // コントラクトID登録
-    function addContract(address addr_, uint256 chainid_) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
+    function addContract(address addr_, uint256 chainId_) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
         NFTContract memory newContract = NFTContract({
             addr: addr_,
-            chainid : chainid_
+            chainId : chainId_
         });
         // 同一チェーンの場合、コントラクトアドレスかチェックする
         if (chainId_ == chainid) {
             require(addr_.isContract(), 'cannot add contract : address is not contract.');
         }
         // コントラクトが未登録であることを確認する
-        require(contractId(addr_, chainid_) == 0, 'cannot add contract : contract already exists');
+        require(contractId(addr_, chainId_) == 0, 'cannot add contract : contract already exists');
         // 内部登録処理を起動
         return _addContract(newContract);
 
@@ -110,11 +110,11 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
 
     // コントラクトID登録(内部関数)
     function _addContract(NFTContract memory contract_) internal virtual returns(uint256) {
-        uint256 newId = _contractCount + 1;
+        uint256 newId = _totalContracts + 1;
         // コントラクトIDを登録する
         _contractId[contract_.addr][contract_.chainId]= newId;
         // コントラクトIDを有効にする
-        _availability[newId] = true;
+        _availablity[newId] = true;
         // 逆引きを登録する
         _contractInfo[newId] = contract_;
         // 同一チェーンの場合、同一チェーンIDリストにコントラクトIDを追加する
@@ -122,7 +122,7 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
             _inChainsId.push(newId);
         }
         //カウントアップ
-        _contractCount += 1;
+        _totalContracts += 1;
         //イベント送信
         emit AddContract(newId, contract_);
         //戻り値を返す
@@ -131,27 +131,27 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
 
     // 登録コントラクトの有効/無効設定
     function setAvailablity(uint256 contractId_, bool val_) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
-        _availability[contractId_] = val_;
+        _availablity[contractId_] = val_;
     }
 
     // ゲッター関数
     function contractId(address contract_, uint256 chainId_) public view virtual returns(uint256){
-        returns _contractId[contract_][chainId_];
+        return _contractId[contract_][chainId_];
     }
     function contractId(NFTContract memory contract_) public view virtual returns(uint256){
-        returns contractId(contract_.addr, contract_.chainId);
+        return contractId(contract_.addr, contract_.chainId);
     }
     function contractInfo(uint256 contractId_) public view virtual returns(NFTContract memory){
         return _contractInfo[contractId_];
     }
-    function contractsCount() public view virtual returns(uint256){
-        return _contractsCount;
+    function totalContracts() public view virtual returns(uint256){
+        return _totalContracts;
     }
-    function inChainsCount() public view virtual returns(uint256){
-        return _inChainId.length;
+    function totalInChains() public view virtual returns(uint256){
+        return _inChainsId.length;
     }
     function availablity(uint256 contractId_) public view virtual returns(bool){
-        returns _availablity[contractId_];
+        return _availablity[contractId_];
     }
     // Pause関連
     function pause() public virtual whenNotPaused onlyRole(PAUSER_ROLE){
@@ -162,15 +162,14 @@ constract BattelToken is ERC20Immobile, Pausable, AccessControl {
     }
 
 
-    function transfer(uint256 contractId,  uint256 amount) public virtual returns (bool) {
+    function transfer(uint256 contractId_,  uint256 amount_) public virtual returns (bool) {
         address owner = _msgSender();
-        _transfer(owner, to, amount);
         return true;
     }
 
 
     // ERC20のうち、使用不可の関数をrevertする
-    function transfer(address to, uint256 amoount) public override return (bool){
+    function transfer(address to, uint256 amount) public override returns (bool){
         revert('This token cannot be tranfered between addresses.');
     }
 

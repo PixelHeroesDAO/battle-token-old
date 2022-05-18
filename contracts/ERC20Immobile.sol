@@ -91,19 +91,19 @@ abstract contract ERC20Immobile is Context, IERC20, IERC20Metadata {
 
     /**
      * @dev See {IERC20-totalSupply}.
-     * change to abstract.
-    function totalSupply() public view virtual override returns (uint256) {
-        return _totalSupply;
-    }
+     * Implementation of ERC20 was eliminated and always return 0.
      */
+    function totalSupply() public view virtual override returns (uint256) {
+        return 0;
+    }
 
     /**
      * @dev See {IERC20-balanceOf}.
-     * change to abstract.
-    function balanceOf(address account) public view virtual override returns (uint256) {
-        return _balances[account];
-    }
+     * Implementation of ERC20 was eliminated and always return 0.
      */
+    function balanceOf(address account) public view virtual override returns (uint256) {
+        return 0;
+    }
 
     /**
      * @dev See {IERC20-transfer}.

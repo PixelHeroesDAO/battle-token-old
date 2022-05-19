@@ -45,6 +45,8 @@
   - approve
   - transferFrom
 
+### 署名内容案
+[ウォレットアドレス][ウォレットNonce][コントラクトID][トークンID][関数ID][トークン量][関数Param1][関数Param2]
 
 
 

@@ -1,3 +1,15 @@
+/* メッセージ署名の方法の確認テストスクリプト
+    **署名プロセス
+    1.ウォレットにプライベートキーを入れてsignerを用意（署名の準備）
+    2.署名するメッセージを用意
+    3.ハッシュメッセージを作成。id関数を使うといろいろutfの処理だとかをまるっとやってくれる模様
+    4.ハッシュメッセージをarrayify関数でバイト形式ハッシュメッセージに変換
+    5.signerにバイト形式ハッシュメッセージへ署名させる
+    **検証プロセス
+    1.バイト形式ハッシュメッセージを用意（この場合上で用意済み）
+    2.verifyMessage関数にバイト形式ハッシュメッセージと署名を渡すと復号アドレスが返る
+    3.復号アドレスとsigner公開アドレスの一致を確認
+*/
 const ethers = require('ethers');
 const main = async () => {
     const allowlistedAddresses = [
@@ -14,6 +26,33 @@ const main = async () => {
     const signer = new ethers.Wallet(privateKey);
     console.log(signer.address)
 
+    // Get first allowlisted address
+    let message = "テスト";
+    console.log(message);
+
+    // Compute hash of the address
+    let messageHash = ethers.utils.id(message);
+    console.log("Message Hash: ", messageHash);
+
+    // Sign the hashed address
+    let messageBytes = ethers.utils.arrayify(messageHash);
+    let signature = await signer.signMessage(messageBytes);
+    console.log("Signature: ", signature);
+    
+    //メッセージハッシュのバイトコードで検証する必要がある
+    let recoveredAddress = ethers.utils.verifyMessage(messageBytes, signature);
+    console.log(recoveredAddress);
+    console.log("veryfication:", recoveredAddress == signer.address);
+
+    //コントラクトでの復号の確認
+    const nftContractFactory = await hre.ethers.getContractFactory('BattleToken');
+    const nftContract = await nftContractFactory.deploy();
+    
+    await nftContract.deployed();
+    
+    console.log("Contract deployed by: ", signer.address);
+    recover = await nftContract.recoverSigner(messageHash, signature);
+    console.log("Message was signed by: ", recover.toString());
 }
 
 const runMain = async () => {

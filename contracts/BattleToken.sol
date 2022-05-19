@@ -9,10 +9,11 @@ import "./ERC20Immobile.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 import "hardhat/console.sol";
 
-contract BattelToken is ERC20Immobile, Pausable, AccessControl {
+contract BattleToken is ERC20Immobile, Pausable, AccessControl {
 
     struct NFTContract{
         address addr;
@@ -29,12 +30,16 @@ contract BattelToken is ERC20Immobile, Pausable, AccessControl {
     uint256[] _inChainsId;
     // 登録済みコントラクト数
     uint256 private _totalContracts;  //=0
+    // トークン操作用のnonce(ウォレットごとに持たせる)
+    mapping(address => uint256) private _nonce;
     // コントラクトのトークン更新有効性([ContractId])
     mapping(uint256 => bool) private _availablity;
-    // トークン残高([ContractId][TokenId])
+    // トークン残高([ContractId][TokenId]) => [balance][nonce]
     mapping(uint256 => mapping(uint256 => uint256)) private _balances;
-    // トークン移動許可
-    mapping(uint256 => mapping(address => uint256)) private _allowance;
+    // トークン移動許可([owner][spender] => [allowance])
+    // 保有者から実行者への許可。チェーン外が保有者を追跡不能なため、ここはチェーン内アドレスの関係として保存する
+    // transfer実行にはMINTER_ROLEの署名がないと実行できない
+    mapping(address => mapping(address => uint256)) private _allowance;
 
     // このコントラクトのチェーンID
     uint256 public immutable chainid = block.chainid;
@@ -44,6 +49,12 @@ contract BattelToken is ERC20Immobile, Pausable, AccessControl {
     // AccessControl関係
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+    // 要署名関数用識別子
+    string public constant SIG_MINT = "SIG_MINT";
+    string public constant SIG_BURN = "SIG_BURN";
+    string public constant SIG_TRANSFER = "SIG_TRANSFER";
+    string public constant SIG_APPROVE = "SIG_APPROVE";
 
     event Transfer(uint256 indexed from, uint256 indexed to, uint256 value);
 
@@ -129,6 +140,30 @@ contract BattelToken is ERC20Immobile, Pausable, AccessControl {
         return newId;
     }
 
+    function recoverSigner(bytes32 hash, bytes memory signature) public pure returns (address) {
+        bytes32 messageDigest = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32", 
+                hash
+            )
+        );
+        return ECDSA.recover(messageDigest, signature);
+    }
+
+    // ミント関数
+    // 作成中
+    function _mint(
+        uint256 contractId_, 
+        uint256 tokenId_, 
+        uint256 amount_, 
+        bytes memory signature
+    ) internal virtual {
+        require(contractId_ > 0, "mint to the zero contractId");
+        require(contractId_ < _totalContracts + 1, "mint to the non-registered contractId");
+        require(_availablity[contractId_], "mint to the non available contract");
+        bytes32 hash = keccak256("test"); 
+        require(hasRole(MINTER_ROLE, recoverSigner(hash, signature)), "invalid signature");
+    }
     // 登録コントラクトの有効/無効設定
     function setAvailablity(uint256 contractId_, bool val_) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
         _availablity[contractId_] = val_;
@@ -162,9 +197,16 @@ contract BattelToken is ERC20Immobile, Pausable, AccessControl {
     }
 
 
-    function transfer(uint256 contractId_,  uint256 amount_) public virtual returns (bool) {
-        address owner = _msgSender();
-        return true;
+    function _transfer(
+        uint256 fromCont, 
+        uint256 fromTokenId, 
+        uint256 toCont, 
+        uint256 toTokenId, 
+        uint256 amount, 
+        bytes32 hash, 
+        bytes memory signature
+    ) internal virtual {
+
     }
 
 

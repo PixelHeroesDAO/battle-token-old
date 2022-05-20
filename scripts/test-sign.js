@@ -9,6 +9,10 @@
     1.バイト形式ハッシュメッセージを用意（この場合上で用意済み）
     2.verifyMessage関数にバイト形式ハッシュメッセージと署名を渡すと復号アドレスが返る
     3.復号アドレスとsigner公開アドレスの一致を確認
+    **solidity復号
+    1.メッセージ内容にkeccak256でハッシュを取る
+    2.フロントから送られてきたsignatureでアドレスを復号する
+      (hashにprefixを付けて、全体をkeccak256を取ったbytes32 digestをECDSA.recoverに渡す)
 */
 const ethers = require('ethers');
 const main = async () => {
@@ -52,7 +56,23 @@ const main = async () => {
     
     console.log("Contract deployed by: ", signer.address);
     recover = await nftContract.recoverSigner(messageHash, signature);
+    console.log("Message was signed by: ", recover.toString() , " message:", message);
+
+    //追加テスト
+    let sigfunc = await nftContract.SIG_MINT();
+    let msgFront = allowlistedAddresses[0]+"|"+"0"+"|"+"1"+"|"+"1"+"|"+sigfunc+"|"+"2000";
+    console.log("msgFront:", msgFront);
+    let msgFrontHash = ethers.utils.id(msgFront);
+    let msgFrontBytes = ethers.utils.arrayify(msgFrontHash);
+    let msgContr = await nftContract._makeMessage(allowlistedAddresses[0],1,1,await nftContract.SIG_MINT(), 2000);
+    console.log("msgContr:", msgContr);
+
+    signature = await signer.signMessage(msgFrontBytes);
+
+    recover = await nftContract.recoverSigner(ethers.utils.arrayify(ethers.utils.id(msgContr)), signature);
     console.log("Message was signed by: ", recover.toString());
+    //messageHash = await nftContract._makeSignHash(allowlistedAddresses[0],1,1,await nftContract.SIG_MINT(), 2000);
+    //console.log (messageHash);
 }
 
 const runMain = async () => {

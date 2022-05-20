@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "./lib/AddressStrings.sol";
 
 import "hardhat/console.sol";
 
@@ -21,6 +22,8 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     }
 
     using Address for address;
+    using Strings for uint256;
+    using AddressStrings for address;
 
     // NFTコントラクトアドレスIDリスト 0は登録なし、1以上で識別No.([addr][ChainId] => contractId)
     mapping(address => mapping(uint256 => uint256)) private _contractId;
@@ -56,7 +59,13 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     string public constant SIG_TRANSFER = "SIG_TRANSFER";
     string public constant SIG_APPROVE = "SIG_APPROVE";
 
-    event Transfer(uint256 indexed from, uint256 indexed to, uint256 value);
+    event Transfer(
+        uint256 indexed from, 
+        uint256 indexed tokenFrom, 
+        uint256 indexed to, 
+        uint256 tokenTo,
+        uint256 amount
+    );
 
     event Approval(uint256 indexed owner, address indexed spender, uint256 value);
 
@@ -150,20 +159,84 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         return ECDSA.recover(messageDigest, signature);
     }
 
-    // ミント関数
-    // 作成中
+    /* 署名用メッセージ生成 ***デバッグ中はpublicだが、リリース時はinternalに変更する
+　      * stringで構成する
+        * 要素間は|で区切る
+        * msg.sender|nonce|contractId|tokendId|sigFunc|amount
+    */
+    function _makeMessage(
+        address account_,
+        uint256 contractId_,
+        uint256 tokenId_,
+        string memory sigFunc_,
+        uint256 amount_
+    )public view virtual returns (string memory){
+        return string(abi.encodePacked(
+            "0x",
+            account_.toAsciiString(), "|", 
+            _nonce[account_].toString(),  "|",
+            contractId_.toString(),  "|",
+            tokenId_.toString(),  "|",
+            sigFunc_, "|",
+            amount_.toString()
+        ));
+    }
+
+    /* ミント関数
+        * チェーンまたぎを想定しているため、フロント側でTx発行の妥当性が検証されている前提。
+        * 検証の証拠としてMINTER_ROLEアドレスの署名を確認する。
+    */
     function _mint(
         uint256 contractId_, 
         uint256 tokenId_, 
         uint256 amount_, 
         bytes memory signature
-    ) internal virtual {
+    ) public virtual {
+        // contractId検証
         require(contractId_ > 0, "mint to the zero contractId");
         require(contractId_ < _totalContracts + 1, "mint to the non-registered contractId");
+        // contractId有効性検証
         require(_availablity[contractId_], "mint to the non available contract");
-        bytes32 hash = keccak256("test"); 
-        require(hasRole(MINTER_ROLE, recoverSigner(hash, signature)), "invalid signature");
+        //署名検証
+        uint256 nonce_ = _nonce[msg.sender];
+        bytes32 hash = keccak256(abi.encodePacked(_makeMessage(
+            msg.sender,
+            contractId_,
+            tokenId_,
+            SIG_MINT,
+            amount_
+        )));
+        console.log(recoverSigner(hash,signature));
+        require(hasRole(MINTER_ROLE, recoverSigner(hash, signature)), "invalid signature to mint");
+
+        _beforeTokenTransfer(0,0, contractId_, tokenId_, amount_);
+
+        _totalSupply += amount_;
+        _balances[contractId_][tokenId_] += amount_;
+        _nonce[msg.sender] += 1;
+        emit Transfer(0,0, contractId_, tokenId_, amount_);
+
+        _afterTokenTransfer(0,0, contractId_, tokenId_, amount_);
+
     }
+
+    function _beforeTokenTransfer(
+        uint256 from, 
+        uint256 tokenFrom,
+        uint256 to, 
+        uint256 tokenTo,
+        uint256 amount
+    ) internal virtual{}
+
+    function _afterTokenTransfer(
+        uint256 from, 
+        uint256 tokenFrom,
+        uint256 to, 
+        uint256 tokenTo,
+        uint256 amount
+    ) internal virtual{}
+
+
     // 登録コントラクトの有効/無効設定
     function setAvailablity(uint256 contractId_, bool val_) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
         _availablity[contractId_] = val_;
@@ -182,8 +255,14 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     function totalContracts() public view virtual returns(uint256){
         return _totalContracts;
     }
+    function balanceById(uint256 contractId_, uint256 tokenId_) public view virtual returns(uint256){
+        return _balances[contractId_][tokenId_];
+    }
     function totalInChains() public view virtual returns(uint256){
         return _inChainsId.length;
+    }
+    function nonce(address addr) public view virtual returns(uint256){
+        return _nonce[addr];
     }
     function availablity(uint256 contractId_) public view virtual returns(bool){
         return _availablity[contractId_];

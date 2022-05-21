@@ -59,15 +59,13 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     string public constant SIG_TRANSFER = "SIG_TRANSFER";
     string public constant SIG_APPROVE = "SIG_APPROVE";
 
-    event Transfer(
+    event TransferById(
         uint256 indexed from, 
         uint256 indexed tokenFrom, 
         uint256 indexed to, 
         uint256 tokenTo,
         uint256 amount
     );
-
-    event Approval(uint256 indexed owner, address indexed spender, uint256 value);
 
     event AddContract(uint256 indexed id, NFTContract nft);
 
@@ -124,8 +122,8 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         // コントラクトが未登録であることを確認する
         require(contractId(addr_, chainId_) == 0, 'cannot add contract : contract already exists');
         // 内部登録処理を起動
-        return _addContract(newContract);
-
+        uint256 ret = _addContract(newContract);
+        return ret;
     }
 
     // コントラクトID登録(内部関数)
@@ -182,16 +180,35 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         ));
     }
 
+    function mint(
+        uint256 contractId_, 
+        uint256 tokenId_, 
+        uint256 amount_, 
+        bytes memory signature
+    ) public virtual {
+        _mint(contractId_, tokenId_, amount_, signature);
+    }
+
+    function burn(
+        uint256 contractId_, 
+        uint256 tokenId_, 
+        uint256 amount_, 
+        bytes memory signature
+    ) public virtual {
+        _burn(contractId_, tokenId_, amount_, signature);
+    }
+
     /* ミント関数
         * チェーンまたぎを想定しているため、フロント側でTx発行の妥当性が検証されている前提。
         * 検証の証拠としてMINTER_ROLEアドレスの署名を確認する。
+        * TransferByIdイベントは無効なContractID:0=>TokenID:0を0x0相当として扱う
     */
     function _mint(
         uint256 contractId_, 
         uint256 tokenId_, 
         uint256 amount_, 
         bytes memory signature
-    ) public virtual {
+    ) internal virtual {
         // contractId検証
         require(contractId_ > 0, "mint to the zero contractId");
         require(contractId_ < _totalContracts + 1, "mint to the non-registered contractId");
@@ -214,9 +231,51 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         _totalSupply += amount_;
         _balances[contractId_][tokenId_] += amount_;
         _nonce[msg.sender] += 1;
-        emit Transfer(0,0, contractId_, tokenId_, amount_);
+        emit TransferById(0,0, contractId_, tokenId_, amount_);
 
         _afterTokenTransfer(0,0, contractId_, tokenId_, amount_);
+
+    }
+
+    /* バーン関数
+        * チェーンまたぎを想定しているため、フロント側でTx発行の妥当性が検証されている前提。
+        * 検証の証拠としてMINTER_ROLEアドレスの署名を確認する。
+        * TransferByIdイベントは無効なContractID:0=>TokenID:0を0x0相当として扱う
+    */
+    function _burn(
+        uint256 contractId_, 
+        uint256 tokenId_, 
+        uint256 amount_, 
+        bytes memory signature
+    ) internal virtual {
+        // contractId検証
+        require(contractId_ > 0, "burn from the zero contractId");
+        require(contractId_ < _totalContracts + 1, "bunr from the non-registered contractId");
+        // contractId有効性検証
+        require(_availablity[contractId_], "burn from the non available contract");
+        // 残高喧噪
+        uint256 bal = balanceById(contractId_, tokenId_);
+        require(amount_ <= bal, "cannot burn : amount is greater than balance");
+        //署名検証
+        uint256 nonce_ = _nonce[msg.sender];
+        bytes32 hash = keccak256(abi.encodePacked(_makeMessage(
+            msg.sender,
+            contractId_,
+            tokenId_,
+            SIG_BURN,
+            amount_
+        )));
+        console.log(recoverSigner(hash,signature));
+        require(hasRole(MINTER_ROLE, recoverSigner(hash, signature)), "invalid signature to mint");
+
+        _beforeTokenTransfer(contractId_, tokenId_, 0, 0, amount_);
+
+        _totalSupply -= amount_;
+        _balances[contractId_][tokenId_] -= amount_;
+        _nonce[msg.sender] += 1;
+        emit TransferById(contractId_, tokenId_, 0, 0, amount_);
+
+        _afterTokenTransfer(contractId_, tokenId_, 0, 0, amount_);
 
     }
 

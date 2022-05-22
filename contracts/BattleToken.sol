@@ -82,6 +82,7 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     }
 
     //同一チェーンかつtokenOfOwnerByIndexのあるコントラクトについて、トークン数を収集する
+    // ※現状supportsinterfaceでうまくtrueがとれていない→これではtrueが得られない？
     function balanceOf(address account) public view  virtual override returns (uint256) {
         address addr;
         uint256 amount = 0;
@@ -89,22 +90,20 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         require(account != address(0), "address zero is not a valid owner");
         for (uint i = 0; i < _inChainsId.length; i++){
             addr = _contractInfo[_inChainsId[i]].addr;
-            try IERC721Enumerable(addr).supportsInterface(bytes4(keccak256('tokenOfOwnerByIndex(address,uint256)'))) 
-                returns (bool retval)
-            {
+            tokenCount = IERC721(addr).balanceOf(account);
+            for (uint j = 0; j < tokenCount ; j++){
                 //tokenOfOwnerByIndexがある場合はトークン数を収集する
-                if (retval){
-                    tokenCount = IERC721(addr).balanceOf(account);
-                    for (uint j = 0; j < tokenCount; j++){
-                        amount += _balances[ _inChainsId[i] ][j];
-                    }
-                }
+                try IERC721Enumerable(addr).tokenOfOwnerByIndex(account, j) 
+                    returns (uint256 retToken)
+                {
+                    amount += _balances[ _inChainsId[i] ][retToken];
 
-            }catch Error (string memory reason) {
-                console.log(_inChainsId[i], reason);
-            }catch (bytes memory reason) {
-                console.log(_inChainsId[i], "low level error was occured.");
-            }
+                }catch Error (string memory reason) {
+                    console.log('error(ContractID, TokenID, msg):', _inChainsId[i], j, reason);
+                }catch (bytes memory reason) {
+                    console.log('error w/o reason(ContractID, TokenID, msg):', _inChainsId[i], j);
+                }
+            }   
         }
         return amount;
     }
@@ -223,7 +222,7 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
             SIG_MINT,
             amount_
         )));
-        console.log(recoverSigner(hash,signature));
+        console.log("recover address :", recoverSigner(hash,signature));
         require(hasRole(MINTER_ROLE, recoverSigner(hash, signature)), "invalid signature to mint");
 
         _beforeTokenTransfer(0,0, contractId_, tokenId_, amount_);

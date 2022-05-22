@@ -7,6 +7,22 @@
   - 本コントラクトと同一チェーンのNFTコントラクトに限る
   - ERC721Enumerabelに準拠しているNFTコントラクトに限る
 
+## 実行方法
+### Node.js バージョン
+
+hardhatドキュメントではv16となっている(22年5月現在)
+
+### インストール
+```
+npm init -y
+npm i --save-dev hardhat
+npm i @openzeppelin/contracts
+```
+### テスト実行
+```
+npx hardhat test
+```
+
 ## 継承
 - ERC20Immobile.sol
   - OpenZeppelinのERC20から不要機能を削除したもの
@@ -27,7 +43,7 @@
 - transfer
   - 実装はするが、無効にしておく
 - 送金許可
-  - _iAllowances コントラクトに対して許可できるようにする
+  - _Allowances コントラクトに対して許可できるようにする
 
 ### 戦歴保管
 
@@ -38,8 +54,8 @@
 ### ERC20機能
 
 - balanceOf
-  - ERC721Enumerableを継承していれば、balanceOfとtokenOfOwnerByIndexで割と軽量に集約できる。supportsinterfaceIdにbytes4(keccak256('tokenOfOwnerByIndex(address,uint256)'))をいれることで確認できる。サポートしていない場合は取得しない。
-- 無効化
+  - tokenOfOwnerByIndexメソッドで所有TokenIDを取得する。取得できないコントラクトは無視する。
+- 無効化(今のところ)
   - transfer
   - allowance
   - approve

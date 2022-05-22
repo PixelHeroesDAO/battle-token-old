@@ -1,7 +1,9 @@
 const { expect, assert } = require("chai");
+const { BigNumber } = require("ethers");
 const { ethers } = require("hardhat");
 const { string } = require("hardhat/internal/core/params/argumentTypes");
 const artifacts = require("../artifacts/contracts/BattleToken.sol/BattleToken.json");
+const artifactsPH = require("../artifacts/contracts/NFT/PixelHeroes.sol/PixelHeroes.json");
 
 
 const nfts = [
@@ -13,17 +15,21 @@ const chainid = [137, 137];
 
 describe("Battle Token Test", function () {
 
-  let admin, minter, user;
+  let admin, minter, user, user2, user3;
   let addr; //コントラクトアドレス
+  let thisChainId;
+  let idPHS, idPHX;
 
   it("Deploy contract", async function () { 
-    [admin, minter, user] = await ethers.getSigners();
+    [admin, minter, user, user2, user3] = await ethers.getSigners();
     const PHBTDepFactory = await ethers.getContractFactory('BattleToken');
     const PHBTDep = await PHBTDepFactory.deploy();
     let tx = await PHBTDep.deployTransaction;
+    thisChainId = tx.chainId;
+    console.log("        Chain ID : ", thisChainId);
     addr = PHBTDep.address;
-    console.log("Deplyed by :", tx.from);
-    console.log("Deplyed to :", PHBTDep.address);
+    console.log("        PHBT Deplyed by :", tx.from);
+    console.log("        PHBT Deplyed to :", PHBTDep.address);
   });
 
   it("Set minter role", async function () { 
@@ -91,7 +97,7 @@ describe("Battle Token Test", function () {
     //コントラクトから得られる署名と比較する。この関数はデバッグ中はpublicになっている
     expect(msg).to.equal(msgContr);
 
-    console.log("message for sign:", msg);
+    console.log("        message for sign:", msg);
     let msgHash = ethers.utils.id(msg);
     let msgBytes = ethers.utils.arrayify(msgHash);
     signature = await minter.signMessage(msgBytes);
@@ -148,5 +154,114 @@ describe("Battle Token Test", function () {
     expect(await PHBT.nonce(user.address)).to.equal(nonce.toNumber()+1);
   });
 
+//PHS, PHXを用意
+  let addrPHS, addrPHX;
+  it("Deploy the PH NFT contracts", async function () { 
+    const PHFactory = await ethers.getContractFactory('PixelHeroes');
+    const PHS = await PHFactory.deploy(
+      "PixelHeroes",
+      "PHS",
+      "ipfs://QmTz7TZCApkDjxB8Wt7zNEVB5YHZCsZHh7mWdgqYiXS38n/",
+      1000);
+    let tx = await PHS.deployTransaction;
+    await tx.wait();
+    addrPHS = PHS.address;
+    console.log("        PHS Deplyed by :", tx.from);
+    console.log("        PHS Deplyed to :", addrPHS);
+    console.log("        PHS maxSupply  :", await PHS.maxSupply().toString());
+    const PHX = await PHFactory.deploy(
+      "Pixel Heroes X",
+      "PHX",
+      "ipfs://QmTWewjSwE7wNPKpKHK1frmiCXXmkvsFpSx8Wk7ms1UwMC/",
+      5555);
+    tx = await PHX.deployTransaction;
+    await tx.wait();
+    addrPHX = PHX.address;
+    console.log("        PHX Deplyed to :", addrPHX);
+    console.log("        PHX maxSupply  :", await PHX.maxSupply().toString());
+  });  
+
+  it(`Mint PHSs`, async function () {
+    const cost = 0.00001;
+    let amount = 10;
+    let fee = amount * cost + 1;
+    const PHS1 = await new ethers.Contract(addrPHS, artifactsPH.abi, user);
+    let overrides = {
+      value: ethers.utils.parseEther(fee.toString())  //,
+    };
+    let tx = await PHS1.mint(amount, overrides);
+    const PHS2 = await new ethers.Contract(addrPHS, artifactsPH.abi, user2);
+    tx = await PHS2.mint(amount, overrides);
+    const PHS3 = await new ethers.Contract(addrPHS, artifactsPH.abi, user3);
+    tx = await PHS3.mint(amount, overrides);
+    console.log("        PHS totalSupply:", await PHS3.totalSupply().toString());
+  });
+
+  it(`Mint PHXs`, async function () {
+    const cost = 0.00001;
+    let amount = 10;
+    let fee = amount * cost + 1;
+    let PHX = await new ethers.Contract(addrPHX, artifactsPH.abi, user);
+    let overrides = {
+      value: ethers.utils.parseEther(fee.toString())  //,
+    };
+    let tx = await PHX.mint(amount, overrides);
+    await tx.wait()
+    PHX = await new ethers.Contract(addrPHX, artifactsPH.abi, user2);
+    tx = await PHX.mint(amount, overrides);
+    await tx.wait()
+    PHX = await new ethers.Contract(addrPHX, artifactsPH.abi, user3);
+    tx = await PHX.mint(amount, overrides);
+    await tx.wait()
+    console.log("        PHX totalSupply:", await PHX.totalSupply().toString());
+  });
+
+
+  it(`Add PHS in PHBT`, async function(){
+    const PHBT = await new ethers.Contract(addr, artifacts.abi, admin);
+    let tx = await PHBT.addContract(addrPHS.toString(), thisChainId);
+    await tx.wait();
+    idPHS = await PHBT["contractId(address,uint256)"](addrPHS.toString(), thisChainId);
+    console.log("        PHS ContractId:", idPHS.toString());
+    tx = await PHBT.addContract(addrPHX.toString(), thisChainId);
+    await tx.wait();
+    idPHX = await PHBT["contractId(address,uint256)"](addrPHX.toString(), thisChainId);
+    console.log("        PHX ContractId:", idPHX.toString());
+    
+  });
+
+  const TID = [2,5,8,14,17];
+  it(`Mint token on PHS , TokenID: ${TID}, Each Amount: ${amountMint/10**18}PHBT`, async function () { 
+
+    const users = [user,user,user,user2, user2];
+    let PHBT;
+    let sigfunc, mgs, msgHash, msgBytes,signature;
+    for (let i = 0 ; i < 5 ; i++ ) {
+      PHBT = await new ethers.Contract(addr, artifacts.abi, users[i]);
+      sigfunc = await PHBT.SIG_MINT();
+        nonce = await PHBT.nonce(users[i].address);
+      msg = 
+        users[i].address.toLowerCase() + "|" +
+        nonce.toString() + "|" + 
+        idPHS.toString() + "|" +
+        TID[i].toString() + "|" + 
+        sigfunc + "|"
+        + amountMint.toString()
+      ;
+      msgHash = ethers.utils.id(msg);
+      msgBytes = ethers.utils.arrayify(msgHash);
+      signature = await minter.signMessage(msgBytes);
+      await PHBT.mint(idPHS, TID[i], amountMint.toString(), signature);
+    }
+    
+    let ret;
+    ret = await PHBT.balanceOf(user.address);
+    ret = ret.div(BigNumber.from(10).pow(BigNumber.from(12))).toNumber()/(10**6);
+    console.log("        PHS user1 balance: ", ret , "PHBT");
+    ret = await PHBT.balanceOf(user2.address);
+    ret = ret.div(BigNumber.from(10).pow(BigNumber.from(12))).toNumber()/(10**6);
+    console.log("        PHS user2 balance: ", ret , "PHBT");
+
+  });
 
 });

@@ -39,10 +39,9 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     mapping(uint256 => bool) private _availablity;
     // トークン残高([ContractId][TokenId]) => [balance][nonce]
     mapping(uint256 => mapping(uint256 => uint256)) private _balances;
-    // トークン移動許可([owner][spender] => [allowance])
-    // 保有者から実行者への許可。チェーン外が保有者を追跡不能なため、ここはチェーン内アドレスの関係として保存する
-    // transfer実行にはMINTER_ROLEの署名がないと実行できない
-    mapping(address => mapping(address => uint256)) private _allowance;
+    // トークン移動許可([ContractId][TokenId][spender] => [allowance])
+    // TokenIDから実行者への移転許可。
+    mapping(uint256 => mapping(uint256 => mapping(address => uint256))) private _allowance;
 
     // このコントラクトのチェーンID
     uint256 public immutable chainid = block.chainid;
@@ -68,6 +67,8 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     );
 
     event AddContract(uint256 indexed id, NFTContract nft);
+
+    event Approve(uint256 indexed cid, uint256 indexed tid, address spender, uint256 amount);
 
     constructor() ERC20Immobile("PixelHeroesBattleToken", "PHBT") public {
         // AccessControlのロール付与。Deployerに各権限を付与する。
@@ -209,27 +210,24 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         bytes memory signature
     ) internal virtual {
         // contractId検証
-        require(contractId_ > 0, "mint to the zero contractId");
-        require(contractId_ < _totalContracts + 1, "mint to the non-registered contractId");
-        // contractId有効性検証
-        require(_availablity[contractId_], "mint to the non available contract");
+        _verifyContractId(contractId_);
         //署名検証
-        uint256 nonce_ = _nonce[msg.sender];
-        bytes32 hash = keccak256(abi.encodePacked(_makeMessage(
+        string memory message =_makeMessage(
             msg.sender,
             contractId_,
             tokenId_,
             SIG_MINT,
             amount_
-        )));
-        console.log("recover address :", recoverSigner(hash,signature));
-        require(hasRole(MINTER_ROLE, recoverSigner(hash, signature)), "invalid signature to mint");
+        );
+        _verifyMinter(message, signature);
 
         _beforeTokenTransfer(0,0, contractId_, tokenId_, amount_);
 
+        _increaseNonce();
+
         _totalSupply += amount_;
         _balances[contractId_][tokenId_] += amount_;
-        _nonce[msg.sender] += 1;
+
         emit TransferById(0,0, contractId_, tokenId_, amount_);
 
         _afterTokenTransfer(0,0, contractId_, tokenId_, amount_);
@@ -248,36 +246,86 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         bytes memory signature
     ) internal virtual {
         // contractId検証
-        require(contractId_ > 0, "burn from the zero contractId");
-        require(contractId_ < _totalContracts + 1, "bunr from the non-registered contractId");
-        // contractId有効性検証
-        require(_availablity[contractId_], "burn from the non available contract");
-        // 残高喧噪
+        _verifyContractId(contractId_);
+        // 残高検証
         uint256 bal = balanceById(contractId_, tokenId_);
         require(amount_ <= bal, "cannot burn : amount is greater than balance");
         //署名検証
-        uint256 nonce_ = _nonce[msg.sender];
-        bytes32 hash = keccak256(abi.encodePacked(_makeMessage(
+        string memory message =_makeMessage(
             msg.sender,
             contractId_,
             tokenId_,
             SIG_BURN,
             amount_
-        )));
-        console.log(recoverSigner(hash,signature));
-        require(hasRole(MINTER_ROLE, recoverSigner(hash, signature)), "invalid signature to mint");
+        );
+        _verifyMinter(message, signature);
 
         _beforeTokenTransfer(contractId_, tokenId_, 0, 0, amount_);
 
+        _increaseNonce();
+
         _totalSupply -= amount_;
         _balances[contractId_][tokenId_] -= amount_;
-        _nonce[msg.sender] += 1;
+
         emit TransferById(contractId_, tokenId_, 0, 0, amount_);
 
         _afterTokenTransfer(contractId_, tokenId_, 0, 0, amount_);
 
     }
 
+    function approve(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_, bytes memory signature)
+        public virtual
+    {
+        _approve(contractId_, tokenId_, spender_, amount_, signature);
+    }
+
+    function _approve(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_, bytes memory signature)
+        internal virtual
+    {
+        // contractId検証
+        _verifyContractId(contractId_);
+        //署名検証
+        string memory message =_makeMessage(
+            msg.sender,
+            contractId_,
+            tokenId_,
+            SIG_APPROVE,
+            amount_
+        );
+        _verifyMinter(message, signature);
+
+        _increaseNonce();
+
+        _allowance[contractId_][tokenId_][spender_] = amount_;
+
+        emit Approve(contractId_, tokenId_, spender_, amount_);
+
+        _afterTokenTransfer(contractId_, tokenId_, 0, 0, amount_);
+
+    }
+
+    function _verifyContractId(uint256 contractId_) internal view virtual returns(bool){
+        // contractId検証
+        require(contractId_ > 0, "burn from the zero contractId");
+        require(contractId_ < _totalContracts + 1, "bunr from the non-registered contractId");
+        // contractId有効性検証
+        require(_availablity[contractId_], "burn from the non available contract");
+        return true;
+    }
+    function _verifyMinter(string memory message, bytes memory signature )
+        internal view returns(bool)
+    {
+        //署名検証
+        bytes32 hash = keccak256(abi.encodePacked(message));
+        require(hasRole(MINTER_ROLE, recoverSigner(hash, signature)), "invalid signature to operate token");
+        return true;
+    }
+
+    function _increaseNonce() internal returns(uint256){
+        uint256 nonce = _nonce[msg.sender] + 1;
+        _nonce[msg.sender] = nonce;
+        return nonce;
+    }
     function _beforeTokenTransfer(
         uint256 from, 
         uint256 tokenFrom,

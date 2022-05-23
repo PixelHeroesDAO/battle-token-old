@@ -135,7 +135,7 @@ describe("Battle Token Test", function () {
     //コントラクトから得られる署名と比較する。この関数はデバッグ中はpublicになっている
     expect(msg).to.equal(msgContr);
 
-    console.log("message for sign:", msg);
+    console.log("        message for sign:", msg);
     let msgHash = ethers.utils.id(msg);
     let msgBytes = ethers.utils.arrayify(msgHash);
     signature = await minter.signMessage(msgBytes);
@@ -168,7 +168,7 @@ describe("Battle Token Test", function () {
     addrPHS = PHS.address;
     console.log("        PHS Deplyed by :", tx.from);
     console.log("        PHS Deplyed to :", addrPHS);
-    console.log("        PHS maxSupply  :", await PHS.maxSupply().toString());
+    console.log("        PHS maxSupply  :", (await PHS.maxSupply()).toString());
     const PHX = await PHFactory.deploy(
       "Pixel Heroes X",
       "PHX",
@@ -178,7 +178,7 @@ describe("Battle Token Test", function () {
     await tx.wait();
     addrPHX = PHX.address;
     console.log("        PHX Deplyed to :", addrPHX);
-    console.log("        PHX maxSupply  :", await PHX.maxSupply().toString());
+    console.log("        PHX maxSupply  :", (await PHX.maxSupply()).toString());
   });  
 
   it(`Mint PHSs`, async function () {
@@ -194,7 +194,7 @@ describe("Battle Token Test", function () {
     tx = await PHS2.mint(amount, overrides);
     const PHS3 = await new ethers.Contract(addrPHS, artifactsPH.abi, user3);
     tx = await PHS3.mint(amount, overrides);
-    console.log("        PHS totalSupply:", await PHS3.totalSupply().toString());
+    console.log("        PHS totalSupply:", (await PHS3.totalSupply()).toString());
   });
 
   it(`Mint PHXs`, async function () {
@@ -213,11 +213,11 @@ describe("Battle Token Test", function () {
     PHX = await new ethers.Contract(addrPHX, artifactsPH.abi, user3);
     tx = await PHX.mint(amount, overrides);
     await tx.wait()
-    console.log("        PHX totalSupply:", await PHX.totalSupply().toString());
+    console.log("        PHX totalSupply:", (await PHX.totalSupply()).toString());
   });
 
 
-  it(`Add PHS in PHBT`, async function(){
+  it(`Add PHS and PHX in PHBT`, async function(){
     const PHBT = await new ethers.Contract(addr, artifacts.abi, admin);
     let tx = await PHBT.addContract(addrPHS.toString(), thisChainId);
     await tx.wait();
@@ -230,30 +230,38 @@ describe("Battle Token Test", function () {
     
   });
 
-  const TID = [2,5,8,14,17];
-  it(`Mint token on PHS , TokenID: ${TID}, Each Amount: ${amountMint/10**18}PHBT`, async function () { 
+  let amountTokens = [0.1*10**18, 0.2*10**18]
+  const TID = [[2,5,8,14,17],[8,12,15,22,25]];
 
-    const users = [user,user,user,user2, user2];
+  it(`Mint token on PHS , TokenID: ${TID[0]}, Each Amount: ${amountTokens[0]/10**18}PHBT\n`
+    +`       Mint token on PHX , TokenID: ${TID[1]}, Each Amount: ${amountTokens[1]/10**18}PHBT`, async function () { 
+    
+    //Mint用の定数・変数の準備
+    const users = [[user,user,user,user2, user2],[user,user2,user2,user3, user3]];
+    let CID = [idPHS,idPHX];
     let PHBT;
     let sigfunc, mgs, msgHash, msgBytes,signature;
-    for (let i = 0 ; i < 5 ; i++ ) {
-      PHBT = await new ethers.Contract(addr, artifacts.abi, users[i]);
-      sigfunc = await PHBT.SIG_MINT();
-        nonce = await PHBT.nonce(users[i].address);
-      msg = 
-        users[i].address.toLowerCase() + "|" +
-        nonce.toString() + "|" + 
-        idPHS.toString() + "|" +
-        TID[i].toString() + "|" + 
-        sigfunc + "|"
-        + amountMint.toString()
-      ;
-      msgHash = ethers.utils.id(msg);
-      msgBytes = ethers.utils.arrayify(msgHash);
-      signature = await minter.signMessage(msgBytes);
-      await PHBT.mint(idPHS, TID[i], amountMint.toString(), signature);
+
+    //Mint実行
+    for (let j = 0 ; j < TID.length ; j++){
+      for (let i = 0 ; i < 5 ; i++ ) {
+        PHBT = await new ethers.Contract(addr, artifacts.abi, users[j][i]);
+        sigfunc = await PHBT.SIG_MINT();
+          nonce = await PHBT.nonce(users[j][i].address);
+        msg = 
+          users[j][i].address.toLowerCase() + "|" +
+          nonce.toString() + "|" + 
+          CID[j].toString() + "|" +
+          TID[j][i].toString() + "|" + 
+          sigfunc + "|"
+          + amountTokens[j].toString()
+        ;
+        msgHash = ethers.utils.id(msg);
+        msgBytes = ethers.utils.arrayify(msgHash);
+        signature = await minter.signMessage(msgBytes);
+        await PHBT.mint(CID[j], TID[j][i], amountTokens[j].toString(), signature);
+      }
     }
-    
     let ret;
     ret = await PHBT.balanceOf(user.address);
     ret = ret.div(BigNumber.from(10).pow(BigNumber.from(12))).toNumber()/(10**6);
@@ -261,7 +269,67 @@ describe("Battle Token Test", function () {
     ret = await PHBT.balanceOf(user2.address);
     ret = ret.div(BigNumber.from(10).pow(BigNumber.from(12))).toNumber()/(10**6);
     console.log("        PHS user2 balance: ", ret , "PHBT");
+    ret = await PHBT.balanceOf(user3.address);
+    ret = ret.div(BigNumber.from(10).pow(BigNumber.from(12))).toNumber()/(10**6);
+    console.log("        PHS user3 balance: ", ret , "PHBT");
 
   });
 
+  it(`Approve and transfer PHX ${TID[1][4]} to PHS ${TID[0][0]} by user2`, async function () { 
+    const PHBT3 = await new ethers.Contract(addr, artifacts.abi, user3);
+    const PHBT2 = await new ethers.Contract(addr, artifacts.abi, user2);
+
+    sigfunc = await PHBT3.SIG_APPROVE();
+    nonce = await PHBT3.nonce(user3.address);
+    amount = 1.2*10**18;
+    msg = 
+    user3.address.toLowerCase() + "|" +
+      nonce.toString() + "|" + 
+      idPHX.toString() + "|" +
+      TID[1][4].toString() + "|" + 
+      sigfunc + "|"
+      + amount.toString()
+    ;
+    msgHash = ethers.utils.id(msg);
+    msgBytes = ethers.utils.arrayify(msgHash);
+    signature = await minter.signMessage(msgBytes);
+    let tx = await PHBT3["approve(uint256,uint256,address,uint256,bytes)"](idPHX, TID[1][4], user2.address.toString(), amount.toString(), signature);
+    tx.wait();
+    let allow = await PHBT3["allowance(uint256,uint256,address)"](idPHX, TID[1][4], user2.address);
+    allow = (allow.div(BigNumber.from(10**12))).toNumber()/10**6;
+    console.log(`        user3 approve ID ${TID[1][4]} of PHX(${idPHX}) to user2 ${user2.address} with ${allow} PHBT`);
+
+    sigfunc = await PHBT2.SIG_TRANSFER();
+    nonce = await PHBT2.nonce(user2.address);
+    amount = 0.15*10**18;
+    msg = 
+    user2.address.toLowerCase() + "|" +
+      nonce.toString() + "|" + 
+      idPHX.toString() + "|" +
+      TID[1][4].toString() + "|" + 
+      sigfunc + "|"
+      + amount.toString()
+    ;
+    msgHash = ethers.utils.id(msg);
+    msgBytes = ethers.utils.arrayify(msgHash);
+    signature = await minter.signMessage(msgBytes);
+    tx = await PHBT2.transferById(idPHX, TID[1][4], idPHS, TID[0][0], amount.toString(), signature);
+    tx.wait();
+
+    let ret;
+    ret = await PHBT2.balanceOf(user.address);
+    ret = ret.div(BigNumber.from(10).pow(BigNumber.from(12))).toNumber()/(10**6);
+    console.log("        PHS user1 balance: ", ret , "PHBT");
+    ret = await PHBT2.balanceOf(user2.address);
+    ret = ret.div(BigNumber.from(10).pow(BigNumber.from(12))).toNumber()/(10**6);
+    console.log("        PHS user2 balance: ", ret , "PHBT");
+    ret = await PHBT2.balanceOf(user3.address);
+    ret = ret.div(BigNumber.from(10).pow(BigNumber.from(12))).toNumber()/(10**6);
+    console.log("        PHS user3 balance: ", ret , "PHBT");
+    allow = await PHBT3["allowance(uint256,uint256,address)"](idPHX, TID[1][4], user2.address);
+    allow = (allow.div(BigNumber.from(10**12))).toNumber()/10**6;
+    console.log(`        user3 approve ID ${TID[1][4]} of PHX(${idPHX}) to user2 ${user2.address} with ${allow} PHBT`);
+
+  });
+      
 });

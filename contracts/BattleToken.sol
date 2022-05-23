@@ -211,6 +211,9 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     ) internal virtual {
         // contractId検証
         _verifyContractId(contractId_);
+
+        _beforeTokenTransfer(0,0, contractId_, tokenId_, amount_);
+
         //署名検証
         string memory message =_makeMessage(
             msg.sender,
@@ -220,8 +223,6 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
             amount_
         );
         _verifyMinter(message, signature);
-
-        _beforeTokenTransfer(0,0, contractId_, tokenId_, amount_);
 
         _increaseNonce();
 
@@ -247,6 +248,9 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     ) internal virtual {
         // contractId検証
         _verifyContractId(contractId_);
+
+        _beforeTokenTransfer(contractId_, tokenId_, 0, 0, amount_);
+
         // 残高検証
         uint256 bal = balanceById(contractId_, tokenId_);
         require(amount_ <= bal, "cannot burn : amount is greater than balance");
@@ -259,8 +263,6 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
             amount_
         );
         _verifyMinter(message, signature);
-
-        _beforeTokenTransfer(contractId_, tokenId_, 0, 0, amount_);
 
         _increaseNonce();
 
@@ -276,12 +278,6 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     function approve(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_, bytes memory signature)
         public virtual
     {
-        _approve(contractId_, tokenId_, spender_, amount_, signature);
-    }
-
-    function _approve(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_, bytes memory signature)
-        internal virtual
-    {
         // contractId検証
         _verifyContractId(contractId_);
         //署名検証
@@ -296,11 +292,16 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
 
         _increaseNonce();
 
+        _approve(contractId_, tokenId_, spender_, amount_);
+    }
+
+    function _approve(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_)
+        internal virtual
+    {
+
         _allowance[contractId_][tokenId_][spender_] = amount_;
 
         emit Approve(contractId_, tokenId_, spender_, amount_);
-
-        _afterTokenTransfer(contractId_, tokenId_, 0, 0, amount_);
 
     }
 
@@ -373,6 +374,9 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     function availablity(uint256 contractId_) public view virtual returns(bool){
         return _availablity[contractId_];
     }
+    function allowance(uint256 ownerCont, uint256 ownerTokenId, address spender) public view virtual returns(uint256){
+        return _allowance[ownerCont][ownerTokenId][spender];
+    }
     // Pause関連
     function pause() public virtual whenNotPaused onlyRole(PAUSER_ROLE){
         _pause();
@@ -381,19 +385,82 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         _unpause();
     }
 
+    function transferById(
+        uint256 fromCont, 
+        uint256 fromTokenId, 
+        uint256 toCont, 
+        uint256 toTokenId, 
+        uint256 amount, 
+        bytes memory signature
+    ) public virtual returns(bool){
+        address spender = msg.sender;
+        _spendAllowance(fromCont, fromTokenId, spender, amount);
+        _transfer(fromCont, fromTokenId, toCont, toTokenId, amount, signature);
+        return true;
+    }
 
+    /* Transfer関数
+        * チェーンまたぎを想定しているため、フロント側でTx発行の妥当性が検証されている前提。
+        * 検証の証拠としてMINTER_ROLEアドレスの署名を確認する。
+        * TransferByIdイベントは無効なContractID:0=>TokenID:0を0x0相当として扱う
+    */
     function _transfer(
         uint256 fromCont, 
         uint256 fromTokenId, 
         uint256 toCont, 
         uint256 toTokenId, 
         uint256 amount, 
-        bytes32 hash, 
         bytes memory signature
     ) internal virtual {
+        // contractId検証
+        _verifyContractId(fromCont);
+        _verifyContractId(toCont);
+
+        // 送金許可量検証
+        require(amount <= _allowance[fromCont][fromTokenId][msg.sender] , "allowance is not enough");
+
+        _beforeTokenTransfer(fromCont, fromTokenId, toCont, toTokenId, amount);
+
+        // 残高検証
+        uint256 fromBal = balanceById(fromCont, fromTokenId);
+        require(amount <= fromBal, "cannot transfer : transfer amount exceeds balance");
+
+        //署名検証
+        string memory message =_makeMessage(
+            msg.sender,
+            fromCont,
+            fromTokenId,
+            SIG_TRANSFER,
+            amount
+        );
+        _verifyMinter(message, signature);
+
+        _increaseNonce();
+        unchecked{
+            _balances[fromCont][fromTokenId] = fromBal - amount;
+        }
+        _balances[toCont][toTokenId] += amount;
+
+        emit TransferById(fromCont, fromTokenId, toCont, toTokenId, amount);
+
+        _afterTokenTransfer(fromCont, fromTokenId, toCont, toTokenId, amount);
 
     }
 
+    function _spendAllowance(
+        uint256 ownerCont,
+        uint256 ownerTokenId,
+        address spender,
+        uint256 amount
+    ) internal virtual{
+        uint256 currentAllowance = allowance(ownerCont,ownerTokenId, spender);
+        if (currentAllowance != type(uint256).max){
+            require(currentAllowance >= amount, "insufficient allowance");
+            unchecked{
+                _approve(ownerCont, ownerTokenId, spender, currentAllowance - amount);
+            }
+        }
+    }
 
     // ERC20のうち、使用不可の関数をrevertする
     function transfer(address to, uint256 amount) public override returns (bool){

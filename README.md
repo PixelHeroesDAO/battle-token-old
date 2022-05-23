@@ -14,9 +14,7 @@ hardhatドキュメントではv16となっている(22年5月現在)
 
 ### インストール
 ```
-npm init -y
-npm i --save-dev hardhat
-npm i @openzeppelin/contracts
+npm install hardhat
 ```
 ### テスト実行
 ```

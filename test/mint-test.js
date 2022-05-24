@@ -276,9 +276,12 @@ describe("Battle Token Test", function () {
   });
 
   it(`Approve and transfer PHX ${TID[1][4]} to PHS ${TID[0][0]} by user2`, async function () { 
+    const PHBTadmin = await new ethers.Contract(addr, artifacts.abi, admin);
     const PHBT3 = await new ethers.Contract(addr, artifacts.abi, user3);
     const PHBT2 = await new ethers.Contract(addr, artifacts.abi, user2);
 
+    await PHBTadmin.setTransferable(true);
+    
     sigfunc = await PHBT3.SIG_APPROVE();
     nonce = await PHBT3.nonce(user3.address);
     amount = 1.2*10**18;

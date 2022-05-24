@@ -45,8 +45,10 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
 
     // このコントラクトのチェーンID
     uint256 public immutable chainid = block.chainid;
-    //ERC20向け
+    // ERC20向け
     uint256 private _totalSupply;
+    // 送金機能の有効性
+    bool private _transferable;
     
     // AccessControl関係
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -70,11 +72,17 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
 
     event Approve(uint256 indexed cid, uint256 indexed tid, address spender, uint256 amount);
 
+    modifier whenTransferable() {
+        require(_transferable, "token transfering is restricted");
+        _;
+    }
     constructor() ERC20Immobile("PixelHeroesBattleToken", "PHBT") public {
         // AccessControlのロール付与。Deployerに各権限を付与する。
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        // 送金可否の初期値設定
+        _transferable = false;
     }
 
     function totalSupply() public view virtual override returns(uint256){
@@ -110,7 +118,10 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     }
     
     // コントラクトID登録
-    function addContract(address addr_, uint256 chainId_) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
+    function addContract(address addr_, uint256 chainId_) 
+        public virtual onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused
+        returns(uint256)
+    {
         NFTContract memory newContract = NFTContract({
             addr: addr_,
             chainId : chainId_
@@ -185,7 +196,7 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         uint256 tokenId_, 
         uint256 amount_, 
         bytes memory signature
-    ) public virtual {
+    ) public virtual whenNotPaused {
         _mint(contractId_, tokenId_, amount_, signature);
     }
 
@@ -194,7 +205,7 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         uint256 tokenId_, 
         uint256 amount_, 
         bytes memory signature
-    ) public virtual {
+    ) public virtual whenNotPaused {
         _burn(contractId_, tokenId_, amount_, signature);
     }
 
@@ -276,7 +287,7 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     }
 
     function approve(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_, bytes memory signature)
-        public virtual
+        public virtual whenNotPaused
     {
         // contractId検証
         _verifyContractId(contractId_);
@@ -349,6 +360,10 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         _availablity[contractId_] = val_;
     }
 
+    // 送金可否設定
+    function setTransferable(bool state) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        _transferable = state;
+    }
     // ゲッター関数
     function contractId(address contract_, uint256 chainId_) public view virtual returns(uint256){
         return _contractId[contract_][chainId_];
@@ -392,7 +407,7 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
         uint256 toTokenId, 
         uint256 amount, 
         bytes memory signature
-    ) public virtual returns(bool){
+    ) public virtual whenNotPaused whenTransferable returns(bool){
         address spender = msg.sender;
         _spendAllowance(fromCont, fromTokenId, spender, amount);
         _transfer(fromCont, fromTokenId, toCont, toTokenId, amount, signature);

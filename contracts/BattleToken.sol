@@ -98,9 +98,9 @@ contract BattleToken is ERC20, Pausable, AccessControl {
     // ※現状supportsinterfaceでうまくtrueがとれていない→これではtrueが得られない？
     function balanceOf(address account) public view  virtual override returns (uint256) {
         address addr;
+        require(account != address(0), "address zero is not a valid owner");
         uint256 amount = _balances[0][msg.sender.toUint()];
         uint256 tokenCount;
-        require(account != address(0), "address zero is not a valid owner");
         for (uint i = 0; i < _inChainsId.length; i++){
             addr = _contractInfo[_inChainsId[i]].addr;
             tokenCount = IERC721(addr).balanceOf(account);

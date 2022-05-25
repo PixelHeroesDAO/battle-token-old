@@ -5,16 +5,18 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "./ERC20Immobile.sol";
+//import "./ERC20Immobile.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./lib/AddressStrings.sol";
+import "./lib/AddressUint.sol";
 
 import "hardhat/console.sol";
 
-contract BattleToken is ERC20Immobile, Pausable, AccessControl {
+contract BattleToken is ERC20, Pausable, AccessControl {
 
     struct NFTContract{
         address addr;
@@ -24,6 +26,8 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     using Address for address;
     using Strings for uint256;
     using AddressStrings for address;
+    using AddressUint for address;
+    using UintAddress for uint256;
 
     // NFTコントラクトアドレスIDリスト 0は登録なし、1以上で識別No.([addr][ChainId] => contractId)
     mapping(address => mapping(uint256 => uint256)) private _contractId;
@@ -70,13 +74,13 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
 
     event AddContract(uint256 indexed id, NFTContract nft);
 
-    event Approve(uint256 indexed cid, uint256 indexed tid, address spender, uint256 amount);
+    event ApproveById(uint256 indexed cid, uint256 indexed tid, address spender, uint256 amount);
 
     modifier whenTransferable() {
         require(_transferable, "token transfering is restricted");
         _;
     }
-    constructor() ERC20Immobile("PixelHeroesBattleToken", "PHBT") public {
+    constructor() ERC20("PixelHeroesBattleToken", "PHBT") public {
         // AccessControlのロール付与。Deployerに各権限を付与する。
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
@@ -94,7 +98,7 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
     // ※現状supportsinterfaceでうまくtrueがとれていない→これではtrueが得られない？
     function balanceOf(address account) public view  virtual override returns (uint256) {
         address addr;
-        uint256 amount = 0;
+        uint256 amount = _balances[0][msg.sender.toUint()];
         uint256 tokenCount;
         require(account != address(0), "address zero is not a valid owner");
         for (uint i = 0; i < _inChainsId.length; i++){
@@ -286,7 +290,7 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
 
     }
 
-    function approve(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_, bytes memory signature)
+    function approveById(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_, bytes memory signature)
         public virtual whenNotPaused
     {
         // contractId検証
@@ -303,16 +307,16 @@ contract BattleToken is ERC20Immobile, Pausable, AccessControl {
 
         _increaseNonce();
 
-        _approve(contractId_, tokenId_, spender_, amount_);
+        _approveById(contractId_, tokenId_, spender_, amount_);
     }
 
-    function _approve(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_)
+    function _approveById(uint256 contractId_, uint256 tokenId_, address spender_, uint256 amount_)
         internal virtual
     {
 
         _allowance[contractId_][tokenId_][spender_] = amount_;
 
-        emit Approve(contractId_, tokenId_, spender_, amount_);
+        emit ApproveById(contractId_, tokenId_, spender_, amount_);
 
     }
 

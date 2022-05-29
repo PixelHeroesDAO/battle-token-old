@@ -476,7 +476,7 @@ contract BattleToken is ERC20, Pausable, AccessControl {
         if (currentAllowance != type(uint256).max){
             require(currentAllowance >= amount, "insufficient allowance");
             unchecked{
-                _approve(ownerCont, ownerTokenId, spender, currentAllowance - amount);
+                _approveById(ownerCont, ownerTokenId, spender, currentAllowance - amount);
             }
         }
     }

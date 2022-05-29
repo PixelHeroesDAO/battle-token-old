@@ -5,6 +5,8 @@ const { string } = require("hardhat/internal/core/params/argumentTypes");
 const artifacts = require("../artifacts/contracts/BattleToken.sol/BattleToken.json");
 const artifactsPH = require("../artifacts/contracts/NFT/PixelHeroes.sol/PixelHeroes.json");
 
+const {deployContract} = require("./helpers");
+
 
 const nfts = [
   '0xE72323d7900f26d13093CaFE76b689964Cc99ffc',
@@ -19,59 +21,64 @@ describe("Battle Token Test", function () {
   let addr; //コントラクトアドレス
   let thisChainId;
   let idPHS, idPHX;
+  let PHBTadmin, PHBT, PHBT2, PHTB3;
 
   it("Deploy contract", async function () { 
     [admin, minter, user, user2, user3] = await ethers.getSigners();
-    const PHBTDepFactory = await ethers.getContractFactory('BattleToken');
-    const PHBTDep = await PHBTDepFactory.deploy();
-    let tx = await PHBTDep.deployTransaction;
+    PHBTadmin = await deployContract("BattleToken");
+    let tx = await PHBTadmin.deployTransaction;
     thisChainId = tx.chainId;
     console.log("        Chain ID : ", thisChainId);
-    addr = PHBTDep.address;
+    addr = PHBTadmin.address;
     console.log("        PHBT Deplyed by :", tx.from);
-    console.log("        PHBT Deplyed to :", PHBTDep.address);
+    console.log("        PHBT Deplyed to :", PHBTadmin.address);
+  });
+
+  it("Set User Wallet", async function () { 
+    PHBT = await new ethers.Contract(addr, artifacts.abi, user);
+    PHBT2 = await new ethers.Contract(addr, artifacts.abi, user2);
+    PHBT3 = await new ethers.Contract(addr, artifacts.abi, user3);
   });
 
   it("Set minter role", async function () { 
-    const PHBT = await new ethers.Contract(addr, artifacts.abi, admin);
-    await PHBT.grantRole(await PHBT.MINTER_ROLE() ,minter.address);
+    //const PHBT = await new ethers.Contract(addr, artifacts.abi, admin);
+    await PHBTadmin.grantRole(await PHBTadmin.MINTER_ROLE() ,minter.address);
   });
 
   it("Add 2 contracts by admin", async function () { 
-    const PHBT = await new ethers.Contract(addr, artifacts.abi, admin);
     // tx => rc -> event
-    let tx = await PHBT.addContract(nfts[0], chainid[0]);
+    let tx = await PHBTadmin.addContract(nfts[0], chainid[0]);
     let reciept = await tx.wait();
     let event = reciept.events.find(event => event.event === 'AddContract');
     let [newId, contractInfo] = event.args;
     //console.log(newId, contractInfo.addr, contractInfo.chainId);
     expect(newId).to.equal(1);
-    expect(await PHBT.totalInChains()).to.equal(0);
-    tx = await PHBT.addContract(nfts[1], chainid[1]);
+    expect(await PHBTadmin.totalInChains()).to.equal(0);
+    tx = await PHBTadmin.addContract(nfts[1], chainid[1]);
     reciept = await tx.wait();
     event = reciept.events.find(event => event.event === 'AddContract');
     [newId, contractInfo] = event.args;
     expect(newId).to.equal(2);
-    expect(await PHBT.totalInChains()).to.equal(0);
+    expect(await PHBTadmin.totalInChains()).to.equal(0);
   });
 
   it("Add a contract by user", async function () { 
-    const PHBT = await new ethers.Contract(addr, artifacts.abi, user);
-    try {
+    await expect(PHBT.addContract(nfts[0], chainid[0])).to.be.revertedWith("AccessControl");
+/*    try {
       await PHBT.addContract(nfts[0], chainid[0]);
     } catch(e) {
       expect(e).to.equal("AccessControl");
-    }
+    }*/
   });
 
 
   it("Add the same contract by admin again", async function () { 
-    const PHBT = await new ethers.Contract(addr, artifacts.abi, admin);
-    try{
+    await expect(PHBTadmin.addContract(nfts[0], chainid[0])).to.be.revertedWith("cannot add contract");
+/*    try{
       await PHBT.addContract(nfts[0], chainid[0]);
     } catch(e) {
       expect(e).to.equal("cannot add contract");
-    }
+    }*/
   });
 
   const amountMint = 0.1 * 10 ** 18;
@@ -296,7 +303,7 @@ describe("Battle Token Test", function () {
     msgHash = ethers.utils.id(msg);
     msgBytes = ethers.utils.arrayify(msgHash);
     signature = await minter.signMessage(msgBytes);
-    let tx = await PHBT3["approve(uint256,uint256,address,uint256,bytes)"](idPHX, TID[1][4], user2.address.toString(), amount.toString(), signature);
+    let tx = await PHBT3["approveById(uint256,uint256,address,uint256,bytes)"](idPHX, TID[1][4], user2.address.toString(), amount.toString(), signature);
     tx.wait();
     let allow = await PHBT3["allowance(uint256,uint256,address)"](idPHX, TID[1][4], user2.address);
     allow = (allow.div(BigNumber.from(10**12))).toNumber()/10**6;

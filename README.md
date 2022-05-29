@@ -1,7 +1,9 @@
 # Pixel Heroes Battle Token
 
 ## 概要
-- ERC20とことなりNFTコントラクトアドレス×チェーンID×トークンIDにトークンを付与・償還する。
+- NFTトークンごとに経験値を含むゲームデータを保存する、貯蔵(Vault)用コントラクトと、ERC20に準拠したウォレットに紐付くゲームトークン用コントラクトに分離する。
+- NFTトークンの経験値は、ゲームトークンに不可逆に移転することができる。詳細は検討中だが、移転権限を持つ移転用コントラクトを別途準備し、経験値の消費とゲームトークンのmintを行う実装を想定。
+- (以下概要は未修正)
 - mint/burn/transferは専用のバックエンドシステムからMinterRoleアドレスの署名付きでのみ可能とする（チェーン外のコントラクトの情報を取得するオラクルを作る必要がありハードルが高い）
 - ERC20準拠の残高表示を提供する。ただし
   - 本コントラクトと同一チェーンのNFTコントラクトに限る
@@ -14,23 +16,29 @@ hardhatドキュメントではv16となっている(22年5月現在)
 
 ### インストール
 ```
-npm install hardhat
+npm install hardhat --save-dev
+npm install --save-dev @openzeppelin/test-helpers
+npm install hardhat-gas-reporter --save-dev
+npm install --save-dev solidity-coverage
 ```
+
+テスト性改善やガス代計算のため、3種類のパッケージを追加 (5/29)
+
 ### テスト実行
-```
+```bash
+## Normal test
 npx hardhat test
+## Test with gas estimation
+npm run testgas
 ```
 
 ## 継承
-- ERC20Immobile.sol
-  - OpenZeppelinのERC20から不要機能を削除したもの
-- Pusable.sol
-  - OpenZeppelinのWizard準拠
-- AccessControl.sol
-  - OpenZeppelinのWizard準拠
-  - mintをオフチェーンDBから署名付きで行うMinterRoleが必要なため
+- 検討中
 
 ## 実装する機能
+
+この内容は概要だけに修正し、個別の機能説明はコントラクトごとのドキュメントに移管予定。
+
 ### トークン保管
 
 - コントラクトアドレスWhiteList

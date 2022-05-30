@@ -6,17 +6,28 @@
 
 ## Overview
 
-Key : `Chain ID(24bits)` + `Contract Address(160bits)` + `Token ID(24bits)` + `Aux(48bits)` = 256bits
+5/31のゲーム内でのboo changとの会話で、以下の実装ですすめることに決定。
+- コレクションIDを登録する（チェーンID×コントラクトアドレス） (0は欠番、1スタートのインクリメンタルID)
+- コレクションID×トークンIDでステータス読み書きをする
 
-- Usage of Aux : 
-  - Experience, Level : Aux
-  - Status : [Status Index(8bits)][Aux(40bits)]
+### コレクションID
 
-Stored parameter :
+collectionId(cID) => `Chain ID(24bits)` + `Contract Address(160bits)` + `Aux(72bits)` = 256bits
 
-- Experience
-- Level
-- Status (HP, Attack, Defense, Speed, luck, etc...)
+チェーン、コントラクト、NFTのID情報を登録
+後半は現状の案で、無くてもよい（コントラクト側ではチェックしない）
+
+### ステータス情報
+
+key : `Collection ID(128bits)` + `Token ID(128bits)` = 256bits
+
+key => Stored parameter(uint256) :
+
+- Experience(64bits/max:18Zeta(10^21))
+- Level(16bits/max:65K)
+- Status (HP, Attack, Defense, Speed, luck, etc...) (16bits/max:65K x 11slots)
+
+keyを元にステータス情報の保存
 
 Message for signature : [wallet address]|[wallet nonce]|[Key]|[Function]
 
@@ -35,6 +46,8 @@ function addExperience(uint24 chainId_, address contract_, bool isSerial_, uint2
 isSerial_が真の場合、startId_とmaxSupply_を保持する。
 isSerial_が偽の場合は0で埋める。
 戻り値はコレクションID。
+
+### 
 
 ### コレクション情報取得関数を追加する
 

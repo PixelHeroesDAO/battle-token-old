@@ -12,10 +12,15 @@
 
 ### コレクションID
 
-collectionId(cID) => `Chain ID(24bits)` + `Contract Address(160bits)` + `Aux(72bits)` = 256bits
+collectionId(cID) => `Chain ID(24bits)` + `Contract Address(160bits)` + `IsSerial(8bit)`
+                     + `startId(24bits)` + `maxSupply(24bits)` + `Aux(16bits)` = 256bits
 
 チェーン、コントラクト、NFTのID情報を登録
-後半は現状の案で、無くてもよい（コントラクト側ではチェックしない）
+- Chain ID : チェーンID
+- Contract Address : NFTコントラクトのアドレス
+- IsSerial : TokenIDが連続して発行されるか否か 0(false) or 1(true)
+- startId : (IsSerial:true) 開始ID, (false) 0
+- maxSupply : (IsSerial:true) 最大供給量 (false) 0 
 
 ### ステータス情報
 
@@ -40,11 +45,14 @@ constructor(string memory ver_)
 
 ### addCollection
 ```solidity
-function addExperience(uint24 chainId_, address contract_, bool isSerial_, uint24 startId_, uint24 maxSupply_) public virtual returns(uint24)
+function addCollection(uint24 chainId_, address contract_, bool isSerial_, uint256 startId_, uint256 maxSupply_) public virtual returns(uint256)
 ```
 コレクションを追加。
 isSerial_が真の場合、startId_とmaxSupply_を保持する。
 isSerial_が偽の場合は0で埋める。
+- isSerial_ (uint8)
+- startId_ (uint24)
+- maxSupply_ (uint24)
 戻り値はコレクションID。
 
 ### 

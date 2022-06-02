@@ -32,6 +32,10 @@ contract GameVault {
     uint256 private constant BITMASK_STATUS_SLOT = (1 << 16) - 1;
     // The bit position of `level` in packed status vault.
     uint256 private constant BITPOS_LEVEL = 64;
+    // The bit position of `status[0]` in packed status vault.
+    uint256 private constant BITPOS_STATUS_FIRST = 80;
+    // The bit length of `status[]` in packed status vault.
+    uint256 private constant BITLENGTH_STATUS_SLOT = 16;
 
     // バージョン情報
     string public version;

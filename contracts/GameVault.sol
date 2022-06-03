@@ -1,25 +1,29 @@
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 import "hardhat/console.sol";
+import "./lib/AddressStrings.sol";
 
-contract GameVault {
+contract GameVault is AccessControl{
+
+    using AddressUint for address;
 
     // Mask of collection data slot (24bits)
     uint256 private constant BITMASK_COLLECTION_SLOT = (1 << 24) - 1;
     // Mask of address
-    uint256 private constant BITMASK_ADDRESS = (! << 160) - 1;
+    uint256 private constant BITMASK_ADDRESS = (1 << 160) - 1;
     // Mask of 'isSerial' of collection data (8bits)
     uint256 private constant BITMASK_IS_SERIAL = (1 << 8) - 1;
     // The bit position of `addr` in packed collection data.
     uint256 private constant BITPOS_ADDRESS = 24;
     // The bit position of `isSerial` in packed collection data.
-    uint256 private constant BITPOS_IS_SERIAL = 144;
+    uint256 private constant BITPOS_IS_SERIAL = 184;
     // The bit position of `startId` in packed collection data.
-    uint256 private constant BITPOS_START_ID = 152;
+    uint256 private constant BITPOS_START_ID = 208;
     // The bit position of `maxSupply` in packed collection data.
-    uint256 private constant BITPOS_MAX_SUPPLY = 176;
+    uint256 private constant BITPOS_MAX_SUPPLY = 233;
 
     // Mask of key value of packed key (128bits)
     uint256 private constant BITMASK_KEY_VALUE = (1 << 128) - 1;
@@ -33,6 +37,14 @@ contract GameVault {
     // The bit position of `level` in packed status vault.
     uint256 private constant BITPOS_LEVEL = 64;
 
+    // uint bool
+    uint256 private constant UINT_TRUE = 1;
+    uint256 private constant UINT_FALSE = 0;
+
+    // AccessControl関係
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
+
     // バージョン情報
     string public version;
     // コレクション情報
@@ -41,10 +53,10 @@ contract GameVault {
     //
     // Bits layout
     // - [0..23]    `chainId`
-    // - [24..143]  `addr` of contract
-    // - [144..151]      `isSerial
-    // - [152..175] `startId'
-    // - [176..199] `maxSupply'
+    // - [24..183]  `addr` of contract
+    // - [184..207] `isSerial
+    // - [208..231] `startId'
+    // - [232..255] `maxSupply'
     mapping(uint256 => uint256) private _packedCollection;
 
     // mapping from packed collectionID(cID) and tokenID(tID) to status vault
@@ -59,11 +71,115 @@ contract GameVault {
     // - [16bits]   Value[]
     mapping(uint256 => uint256) private _packedStatusVault;
 
+    // 登録済みコレクション数
+    uint128 private _totalCollection;
+
+    //エラー関数
+    // 存在しないコレクションへの参照
+    error ReferNonexistentCollection();
+    // ID0コレクションへの参照
+    error ReferZeroCollection();
 
     constructor (string memory ver_) {
         version = ver_
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(SIGNER_ROLE, msg.sender);
     }
 
+    /**
+     * @dev NFT collectionを登録する。
+     * The internal collection ID is valid in uint128.
+     * @param chainId_  NFTコントラクトのチェーンID(内部uint24)
+     * @param addr_     NFTコントラクトアドレス
+     * @param isSerial_ needs true if the collection is issued serialy. uint8 internally.
+     * @param stardId_ is only used when isSerial is true. Otherwise assign 0. uint24 internally.
+     * @param maxSupply_ is only used when isSerial is true. Otherwise assign 0. uint24 internally.
+     */
+    function addCollection(
+        uint256 chainId_, 
+        address addr_, 
+        bool isSerial_,
+        uint256 stardId_,
+        uint256 maxSupply_
+    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
+        return _addCollection(
+            uint24(chainId_), 
+            addr_, 
+            isSerial_, 
+            uint24(startId_), 
+            uint24(maxSupply_)
+        );
+    }
 
+    /**
+     * @dev NFT collectionを登録する。開始・発行数を登録しない場合用。
+     * The internal collection ID is valid in uint128.
+     * @param chainId_  NFTコントラクトのチェーンID(内部uint24)
+     * @param addr_     NFTコントラクトアドレス
+     */
+    function addCollection(
+        uint256 chainId_, 
+        address addr_, 
+    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
+        return _addCollection(uint24(chainId_), addr_, false, uint24(0), uint24(0));
+    }
+
+    /**
+     * @dev Add NFT collection on vault. Return collection ID. Internal function.
+     * The internal collection ID is valid in uint128.
+     * @param isSerial_ needs true if the collection is issued serialy.
+     * @param stardId_ is only used when isSerial is true. Otherwise assign 0. uint48 internally.
+     * @param maxSupply_ is only used when isSerial is true. Otherwise assign 0. uint48 internally.
+     */
+    function _addCollection(
+        uint24 chainId_, 
+        address addr_, 
+        bool isSerial_,
+        uint24 startId_,
+        uint24 maxSupply_
+    ) internal returns(uint256){
+        uint256 newId = uint256(_totalCollection + 1);
+        uint256 packedData = uint256(chainId_) | (addr_.toUint() << BITPOS_ADDRESS);
+        if (isSerial_){
+            packedData = packedData |
+                (uint256(maxSupply_) << BITPOS_MAX_SUPPLY) |
+                (uint256(startId_) << BITPOS_START_ID) |
+                (UINT_TRUE << BITPOS_IS_SERIAL);
+        }
+        _totalCollection += 1;
+        _collectionId[newId] = packedData;
+        return newId;
+    }
+
+    /**
+     * @dev Return total number of registered NFT collection.
+     * The internal collection ID is valid in uint128.
+     */
+    function totalCollection() public view returns (uint256){
+        return uint256(_totalCollection);
+    }
+
+    /**
+     * @dev Return total number of registered NFT collection.
+     * The internal collection ID is valid in uint128.
+     */
+    function collection(uint256 cID) public view returns (
+        uint256 chainId_, 
+        address addr_, 
+        bool isSerial_, 
+        uint256 startId_, 
+        uint256 maxSupply_
+    ){
+        if (cID > uint256(_totalCollection)) revert ReferNonexistentCollection();
+        if (cID == 0) revert ReferZeroCollection();
+        uint256 packedUint = _packedCollection[cID];
+        chainId_ = packedUint & BITMASK_COLLECTION_SLOT;
+        addr_ = (packedUint >> BITPOS_ADDRESS) & BITMASK_ADDRESS;
+        isSerial_ = (packedUint >> .BITPOS_IS_SERIAL) & BITMASK_IS_SERIAL;
+        startId_ = (packedUint >> BITPOS_START_ID) & BITMASK_COLLECTION_SLOT;
+        maxSupply_ = (packedUint >> BITPOS_MAX_SUPPLY) & BITMASK_COLLECTION_SLOT;
+    }
+    import "./
 }
 

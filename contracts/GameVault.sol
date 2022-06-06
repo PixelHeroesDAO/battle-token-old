@@ -4,11 +4,12 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 import "hardhat/console.sol";
-import "./lib/AddressStrings.sol";
+import "./lib/AddressUint.sol";
 
 contract GameVault is AccessControl{
 
     using AddressUint for address;
+    using UintAddress for uint256;
 
     // Mask of collection data slot (24bits)
     uint256 private constant BITMASK_COLLECTION_SLOT = (1 << 24) - 1;
@@ -85,7 +86,7 @@ contract GameVault is AccessControl{
     error ReferZeroCollection();
 
     constructor (string memory ver_) {
-        version = ver_
+        version = ver_;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);
@@ -97,14 +98,14 @@ contract GameVault is AccessControl{
      * @param chainId_  NFTコントラクトのチェーンID(内部uint24)
      * @param addr_     NFTコントラクトアドレス
      * @param isSerial_ needs true if the collection is issued serialy. uint8 internally.
-     * @param stardId_ is only used when isSerial is true. Otherwise assign 0. uint24 internally.
+     * @param startId_ is only used when isSerial is true. Otherwise assign 0. uint24 internally.
      * @param maxSupply_ is only used when isSerial is true. Otherwise assign 0. uint24 internally.
      */
     function addCollection(
         uint256 chainId_, 
         address addr_, 
         bool isSerial_,
-        uint256 stardId_,
+        uint256 startId_,
         uint256 maxSupply_
     ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
         return _addCollection(
@@ -124,7 +125,7 @@ contract GameVault is AccessControl{
      */
     function addCollection(
         uint256 chainId_, 
-        address addr_, 
+        address addr_
     ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
         return _addCollection(uint24(chainId_), addr_, false, uint24(0), uint24(0));
     }
@@ -133,7 +134,7 @@ contract GameVault is AccessControl{
      * @dev Add NFT collection on vault. Return collection ID. Internal function.
      * The internal collection ID is valid in uint128.
      * @param isSerial_ needs true if the collection is issued serialy.
-     * @param stardId_ is only used when isSerial is true. Otherwise assign 0. uint48 internally.
+     * @param startId_ is only used when isSerial is true. Otherwise assign 0. uint48 internally.
      * @param maxSupply_ is only used when isSerial is true. Otherwise assign 0. uint48 internally.
      */
     function _addCollection(
@@ -152,7 +153,7 @@ contract GameVault is AccessControl{
                 (UINT_TRUE << BITPOS_IS_SERIAL);
         }
         _totalCollection += 1;
-        _collectionId[newId] = packedData;
+        _packedCollection[newId] = packedData;
         return newId;
     }
 
@@ -179,11 +180,15 @@ contract GameVault is AccessControl{
         if (cID == 0) revert ReferZeroCollection();
         uint256 packedUint = _packedCollection[cID];
         chainId_ = packedUint & BITMASK_COLLECTION_SLOT;
-        addr_ = (packedUint >> BITPOS_ADDRESS) & BITMASK_ADDRESS;
-        isSerial_ = (packedUint >> .BITPOS_IS_SERIAL) & BITMASK_IS_SERIAL;
+        addr_ = ((packedUint >> BITPOS_ADDRESS) & BITMASK_ADDRESS).toAddress();
+        if((packedUint >> BITPOS_IS_SERIAL) & BITMASK_IS_SERIAL == 0){
+            isSerial_ = false;
+        } else{
+            isSerial_ = true;
+        }
         startId_ = (packedUint >> BITPOS_START_ID) & BITMASK_COLLECTION_SLOT;
         maxSupply_ = (packedUint >> BITPOS_MAX_SUPPLY) & BITMASK_COLLECTION_SLOT;
     }
-    import "./
+    
 }
 

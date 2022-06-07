@@ -2,9 +2,13 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+
+import "./lib/AddressStrings.sol";
+import "./lib/AddressUint.sol";
 
 import "hardhat/console.sol";
-import "./lib/AddressUint.sol";
+
 
 contract GameVault is AccessControl{
 
@@ -76,6 +80,9 @@ contract GameVault is AccessControl{
     // - [16bits]   Value[]
     mapping(uint256 => uint256) private _packedStatusVault;
 
+    // wallet nonce for status updating transaction
+    mapping(address => uint256) public nonce;
+
     // 登録済みコレクション数
     uint128 private _totalCollection;
     // イベント
@@ -88,6 +95,8 @@ contract GameVault is AccessControl{
     error ReferZeroCollection();
     // statusのスロットサイズエラー
     error SetOutSizedStatus();
+    // 不正な署名による操作
+    error OperateWithInvalidSignature();
 
     constructor (string memory ver_) {
         version = ver_;
@@ -233,5 +242,50 @@ contract GameVault is AccessControl{
     {
         return _setStatus(cID, tID, exp, lv, status);
     }
+
+    function recoverSigner(bytes32 hash, bytes memory signature) internal pure returns (address) {
+        bytes32 messageDigest = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32", 
+                hash
+            )
+        );
+        return ECDSA.recover(messageDigest, signature);
+    }
+
+    /**
+     * @dev make message for sign to update status by user
+     *   The message contains address of user, nonce of address, cID and tID
+     *   with "|" separator. All parts are string.
+     * @param addr  EOA of user
+     * @param cID   Collection ID
+     * @param tID   Token ID of collection
+     */
+    function _makeMessage(
+        address addr,
+        uint256 cID,
+        uint256 tID,
+    )internal view virtual returns (string memory){
+        return string(abi.encodePacked(
+            "0x",
+            addr.toAsciiString(), "|", 
+            nonce[addr].toString(),  "|",
+            cID_.toString(),  "|",
+            tID.toString()
+        ));
+    }
+
+    /**
+     * @dev verify signature function
+     */
+    function _verifySigner(string memory message, bytes memory signature )
+        internal view returns(bool)
+    {
+        //署名検証
+        bytes32 hash = keccak256(abi.encodePacked(message));
+        if(hasRole(SIGNER_ROLE, recoverSigner(hash, signature))) revert OperateWithInvalidSignature();
+        return true;
+    }
+
 }
 

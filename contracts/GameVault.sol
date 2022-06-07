@@ -78,12 +78,16 @@ contract GameVault is AccessControl{
 
     // 登録済みコレクション数
     uint128 private _totalCollection;
+    // イベント
+    event AddCollection(uint256 indexed collectionId, uint24 chainId, address addr);
 
     //エラー関数
     // 存在しないコレクションへの参照
     error ReferNonexistentCollection();
     // ID0コレクションへの参照
     error ReferZeroCollection();
+    // statusのスロットサイズエラー
+    error SetOutSizedStatus();
 
     constructor (string memory ver_) {
         version = ver_;
@@ -154,6 +158,7 @@ contract GameVault is AccessControl{
         }
         _totalCollection += 1;
         _packedCollection[newId] = packedData;
+        emit AddCollection(newId, chainId_, addr_);
         return newId;
     }
 
@@ -189,6 +194,44 @@ contract GameVault is AccessControl{
         startId_ = (packedUint >> BITPOS_START_ID) & BITMASK_COLLECTION_SLOT;
         maxSupply_ = (packedUint >> BITPOS_MAX_SUPPLY) & BITMASK_COLLECTION_SLOT;
     }
-    
+
+    /**
+     * @dev Set all status data internally.
+     * Public interfce function must be allowed with sign by signer role account
+     * if user should pay gas fee.
+     * @param cID       collection ID
+     * @param tID       token ID of collection
+     * @param exp       experience of token
+     * @param lv        level of token
+     * @param status    array of status. max length is 11.
+     *   if length is under 11, lack slot(s) is filled with 0.
+     */
+    function _setStatus(uint128 cID, uint128 tID, uint64 exp, uint16 lv, uint16[] memory status)
+        internal returns(bool)
+    {
+        if (cID > uint256(_totalCollection)) revert ReferNonexistentCollection();
+        if (cID == 0) revert ReferZeroCollection();
+        uint256 len = status.length;
+        if (len > 11) revert SetOutSizedStatus();
+        uint256 packedData = 
+            exp | 
+            (uint256(lv) << BITPOS_LEVEL);
+        for (uint256 i ; i < len ; i++){
+            packedData = 
+                packedData | 
+                (uint256(status[i]) << (BITPOS_STATUS_FIRST + BITMASK_STATUS_SLOT * i));
+        }
+        _packedStatusVault[cID | (uint256(tID) << BITPOS_TOKEN_ID)] = packedData;
+        return true;
+    }
+
+    /**
+     * Test function for setStatus
+     */
+    function _setStatusTEST(uint128 cID, uint128 tID, uint64 exp, uint16 lv, uint16[] memory status)
+        public returns(bool)
+    {
+        return _setStatus(cID, tID, exp, lv, status);
+    }
 }
 

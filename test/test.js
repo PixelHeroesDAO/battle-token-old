@@ -58,15 +58,27 @@ describe(`${_name} TEST`, function () {
   });
 
   it("Get information of the collections", async function () { 
-    let colid = 1;
     let cid, addr, serial, startId, maxSupply;
-    let ret = await ContAdmin.collection(colid);
-    [cid, addr, serial, startId, maxSupply] = ret;
-    console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId.toNumber(), maxSupply.toNumber());
-    colid ++;
-    ret = await ContAdmin.collection(colid);
-    [cid, addr, serial, startId, maxSupply] = ret;
-    console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId.toNumber(), maxSupply.toNumber());
+    let ret;
+    for (let colid = 1; colid <= 2 ; colid++){
+        ret = await ContAdmin.collection(colid);
+        [cid, addr, serial, startId, maxSupply] = ret;
+        expect(cid).to.be.equal(chainid[colid-1]);
+        expect(addr).to.be.equal(nfts[colid-1]);
+        console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId.toNumber(), maxSupply.toNumber());
+    
+    }
+  });
+
+  it("Testing set ststus of collection 1 Token 1", async function () {
+    let colid = 1;
+    let tid = 1;
+    let exp = 123242;
+    let lv = 2;
+    let status = [10,23,45,35,23,66];
+
+    let ret = await ContAdmin._setStatusTEST(colid,tid,exp,lv,status);
+
   });
 
 });

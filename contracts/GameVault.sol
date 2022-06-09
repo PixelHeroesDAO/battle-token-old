@@ -1,9 +1,10 @@
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+//import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
+import "./lib/RecoverSigner.sol";
 import "./lib/AddressStrings.sol";
 import "./lib/AddressUint.sol";
 
@@ -12,6 +13,8 @@ import "hardhat/console.sol";
 
 contract GameVault is AccessControl{
 
+    using Strings for uint256;
+    using AddressStrings for address;
     using AddressUint for address;
     using UintAddress for uint256;
 
@@ -197,7 +200,7 @@ contract GameVault is AccessControl{
         addr_ = ((packedUint >> BITPOS_ADDRESS) & BITMASK_ADDRESS).toAddress();
         if((packedUint >> BITPOS_IS_SERIAL) & BITMASK_IS_SERIAL == 0){
             isSerial_ = false;
-        } else{
+        } else {
             isSerial_ = true;
         }
         startId_ = (packedUint >> BITPOS_START_ID) & BITMASK_COLLECTION_SLOT;
@@ -243,15 +246,6 @@ contract GameVault is AccessControl{
         return _setStatus(cID, tID, exp, lv, status);
     }
 
-    function recoverSigner(bytes32 hash, bytes memory signature) internal pure returns (address) {
-        bytes32 messageDigest = keccak256(
-            abi.encodePacked(
-                "\x19Ethereum Signed Message:\n32", 
-                hash
-            )
-        );
-        return ECDSA.recover(messageDigest, signature);
-    }
 
     /**
      * @dev make message for sign to update status by user
@@ -264,13 +258,13 @@ contract GameVault is AccessControl{
     function _makeMessage(
         address addr,
         uint256 cID,
-        uint256 tID,
+        uint256 tID
     )internal view virtual returns (string memory){
         return string(abi.encodePacked(
             "0x",
             addr.toAsciiString(), "|", 
             nonce[addr].toString(),  "|",
-            cID_.toString(),  "|",
+            cID.toString(),  "|",
             tID.toString()
         ));
     }
@@ -282,8 +276,8 @@ contract GameVault is AccessControl{
         internal view returns(bool)
     {
         //署名検証
-        bytes32 hash = keccak256(abi.encodePacked(message));
-        if(hasRole(SIGNER_ROLE, recoverSigner(hash, signature))) revert OperateWithInvalidSignature();
+        if(hasRole(SIGNER_ROLE, RecoverSigner.recoverSignerByMsg(message, signature))) 
+            revert OperateWithInvalidSignature();
         return true;
     }
 

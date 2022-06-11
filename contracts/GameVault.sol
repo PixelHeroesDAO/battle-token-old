@@ -48,6 +48,8 @@ contract GameVault is AccessControl{
     uint256 private constant BITPOS_STATUS_FIRST = 80;
     // The bit length of `status[]` in packed status vault.
     uint256 private constant BITLENGTH_STATUS_SLOT = 16;
+    // Length of status slot
+    uint256 private constant LENGTH_STATUS_SLOT = 11;
 
     // uint bool
     uint256 private constant UINT_TRUE = 1;
@@ -56,6 +58,7 @@ contract GameVault is AccessControl{
     // AccessControl関係
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
+
 
     // バージョン情報
     string public version;
@@ -100,6 +103,7 @@ contract GameVault is AccessControl{
     error SetOutSizedStatus();
     // 不正な署名による操作
     error OperateWithInvalidSignature();
+
 
     constructor (string memory ver_) {
         version = ver_;
@@ -186,15 +190,14 @@ contract GameVault is AccessControl{
      * @dev Return total number of registered NFT collection.
      * The internal collection ID is valid in uint128.
      */
-    function collection(uint256 cID) public view returns (
+    function collection(uint128 cID) public view returns (
         uint256 chainId_, 
         address addr_, 
         bool isSerial_, 
         uint256 startId_, 
         uint256 maxSupply_
     ){
-        if (cID > uint256(_totalCollection)) revert ReferNonexistentCollection();
-        if (cID == 0) revert ReferZeroCollection();
+        _checkCollectionId(cID);
         uint256 packedUint = _packedCollection[cID];
         chainId_ = packedUint & BITMASK_COLLECTION_SLOT;
         addr_ = ((packedUint >> BITPOS_ADDRESS) & BITMASK_ADDRESS).toAddress();
@@ -211,18 +214,22 @@ contract GameVault is AccessControl{
      * @dev Set all status data internally.
      * Public interfce function must be allowed with sign by signer role account
      * if user should pay gas fee.
-     * @param cID       collection ID
-     * @param tID       token ID of collection
-     * @param exp       experience of token
-     * @param lv        level of token
-     * @param status    array of status. max length is 11.
+     * @param cID           collection ID
+     * @param tID           token ID of collection
+     * @param packedData    Packed status data
      *   if length is under 11, lack slot(s) is filled with 0.
      */
-    function _setStatus(uint128 cID, uint128 tID, uint64 exp, uint16 lv, uint16[] memory status)
+    function _setStatus(uint128 cID, uint128 tID, uint256 packedData)
         internal returns(bool)
     {
-        if (cID > uint256(_totalCollection)) revert ReferNonexistentCollection();
-        if (cID == 0) revert ReferZeroCollection();
+        _checkCollectionId(cID);
+        _packedStatusVault[_makePackedId(cID, tID)] = packedData;
+        return true;
+    }
+
+    function _makePackedStatus(uint64 exp, uint16 lv, uint16[] memory status)
+        internal view returns(uint256)
+    {
         uint256 len = status.length;
         if (len > 11) revert SetOutSizedStatus();
         uint256 packedData = 
@@ -233,42 +240,101 @@ contract GameVault is AccessControl{
                 packedData | 
                 (uint256(status[i]) << (BITPOS_STATUS_FIRST + BITMASK_STATUS_SLOT * i));
         }
-        _packedStatusVault[cID | (uint256(tID) << BITPOS_TOKEN_ID)] = packedData;
-        return true;
+        return packedData;
+    }
+
+    function _makePackedId(uint128 cID, uint128 tID) internal view returns(uint256){
+        return cID | (uint256(tID) << BITPOS_TOKEN_ID);
     }
 
     /**
      * Test function for setStatus
      */
-    function _setStatusTEST(uint128 cID, uint128 tID, uint64 exp, uint16 lv, uint16[] memory status)
+    function TEST_setStatus(uint128 cID, uint128 tID, uint64 exp, uint16 lv, uint16[] memory status)
         public returns(bool)
     {
-        return _setStatus(cID, tID, exp, lv, status);
+        return _setStatus(cID, tID, _makePackedStatus(exp, lv, status));
     }
 
+    function setStatus(
+        uint128 cID, 
+        uint128 tID, 
+        uint64 exp, 
+        uint16 lv, 
+        uint16[] memory status,
+        bytes memory signature
+        ) external
+    {
+        _checkStatus(exp, lv, status);
+        _verifySigner(_makeMessage(msg.sender, cID, tID, exp, lv, status), signature);
+        _setStatus(cID, tID, _makePackedStatus(exp, lv, status));
+    }
+
+    function _checkCollectionId(uint128 cID) internal virtual view returns(bool){
+        if (cID > uint256(_totalCollection)) revert ReferNonexistentCollection();
+        if (cID == 0) revert ReferZeroCollection();
+        return true;
+    }
+    /**
+     * @dev Check status data. This function is called before storing data.
+     *      Default implementation is nothing.
+     *      Overriding depends on each vault specifiation.
+     */
+    function _checkStatus(uint64 exp, uint16 lv, uint16[] memory status)
+        internal virtual view returns(bool)
+    {
+        return true;
+    }
 
     /**
      * @dev make message for sign to update status by user
      *   The message contains address of user, nonce of address, cID and tID
      *   with "|" separator. All parts are string.
-     * @param addr  EOA of user
-     * @param cID   Collection ID
-     * @param tID   Token ID of collection
+     * @param addr      EOA of user
+     * @param cID       Collection ID
+     * @param tID       Token ID of collection
+     * @param exp       Experience
+     * @param lv        Level
+     * @param status    Array of status
      */
     function _makeMessage(
         address addr,
         uint256 cID,
-        uint256 tID
+        uint256 tID,
+        uint64 exp, 
+        uint16 lv, 
+        uint16[] memory status
     )internal view virtual returns (string memory){
-        return string(abi.encodePacked(
+        string memory ret = string(abi.encodePacked(
             "0x",
             addr.toAsciiString(), "|", 
             nonce[addr].toString(),  "|",
-            cID.toString(),  "|",
-            tID.toString()
+            cID.toString(), "|",
+            tID.toString(), "|",
+            uint256(exp).toString(), "|",
+            uint256(lv).toString()
         ));
+        uint256 len = status.length;
+        for (uint256 i = 0 ; i < LENGTH_STATUS_SLOT ; i++){
+            if (i < len) {
+                ret = string(abi.encodePacked(ret, "|", uint256(status[i]).toString()));
+            } else {
+                ret = string(abi.encodePacked(ret, "|", "0"));
+            }
+        }
+        return ret;
     }
 
+    function TEST_makeMessage(
+        address addr,
+        uint256 cID,
+        uint256 tID,
+        uint64 exp, 
+        uint16 lv, 
+        uint16[] memory status
+    )public view returns (string memory){
+        return _makeMessage(addr, cID, tID, exp, lv, status);
+    }
     /**
      * @dev verify signature function
      */

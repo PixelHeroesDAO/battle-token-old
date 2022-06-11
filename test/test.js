@@ -77,8 +77,33 @@ describe(`${_name} TEST`, function () {
     let lv = 2;
     let status = [10,23,45,35,23,66];
 
-    let ret = await ContAdmin._setStatusTEST(colid,tid,exp,lv,status);
+    let ret = await ContAdmin.TEST_setStatus(colid,tid,exp,lv,status);
 
+  });
+
+  it("Testing make message", async function () {
+    let colid = 1;
+    let tid = 1;
+    let exp = 123242;
+    let lv = 2;
+    let status = [10,23,45,35,23,66];
+
+    let ret = await Cont1.TEST_makeMessage(Cont1.address,colid,tid,exp,lv,status);
+    let msg = String(Cont1.address).toLowerCase() + "|" +
+      await Cont1.nonce(Cont1.address) + "|" +
+      String(colid) + "|" +
+      String(tid) + "|" +
+      String(exp) + "|" +
+      String(lv);
+    for (let i = 0 ; i < 11 ; i++){
+      if (i < status.length) {
+        msg = msg + "|" + String(status[i]); 
+      }else{
+        msg = msg + "|0"; 
+      }
+    }
+    console.log(`       Message:${ret}`)
+    expect(ret).to.be.equal(msg);
   });
 
 });

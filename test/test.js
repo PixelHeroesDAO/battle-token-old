@@ -5,7 +5,7 @@ const { string } = require("hardhat/internal/core/params/argumentTypes");
 const artifacts = require("../artifacts/contracts/GameVault.sol/GameVault.json");
 const artifactsPH = require("../artifacts/contracts/NFT/PixelHeroes.sol/PixelHeroes.json");
 
-const {deployContract} = require("../test/helpers");
+const {deployContract, makeMessage, makeMessageBytes} = require("../test/helpers");
 
 
 const nfts = [
@@ -34,6 +34,11 @@ describe(`${_name} TEST`, function () {
     console.log(`        ${_name} Deplyed by :`, tx.from);
     console.log(`        ${_name} Deplyed to :`, ContAdmin.address);
   });
+
+  it(`Set signer role`, async function () {
+    let tx = await ContAdmin.grantRole(await ContAdmin.SIGNER_ROLE(), signer.address);
+    expect(await ContAdmin.hasRole(await ContAdmin.SIGNER_ROLE(), signer.address)).to.be.equal(true);
+  })
 
   it("Set User Wallet", async function () { 
     Cont1 = await new ethers.Contract(addr, artifacts.abi, user1);
@@ -70,17 +75,6 @@ describe(`${_name} TEST`, function () {
     }
   });
 
-  it("Testing set ststus of collection 1 Token 1", async function () {
-    let colid = 1;
-    let tid = 1;
-    let exp = 123242;
-    let lv = 2;
-    let status = [10,23,45,35,23,66];
-
-    let ret = await ContAdmin.TEST_setStatus(colid,tid,exp,lv,status);
-
-  });
-
   it("Testing make message", async function () {
     let colid = 1;
     let tid = 1;
@@ -89,22 +83,55 @@ describe(`${_name} TEST`, function () {
     let status = [10,23,45,35,23,66];
 
     let ret = await Cont1.TEST_makeMessage(Cont1.address,colid,tid,exp,lv,status);
-    let msg = String(Cont1.address).toLowerCase() + "|" +
-      await Cont1.nonce(Cont1.address) + "|" +
-      String(colid) + "|" +
-      String(tid) + "|" +
-      String(exp) + "|" +
-      String(lv);
-    for (let i = 0 ; i < 11 ; i++){
-      if (i < status.length) {
-        msg = msg + "|" + String(status[i]); 
-      }else{
-        msg = msg + "|0"; 
-      }
-    }
+    let msg = makeMessage
+    (
+      Cont1.address,
+      await Cont1.nonce(Cont1.address),
+      colid,
+      tid,
+      exp,
+      lv,
+      status
+    );
     console.log(`       Message:${ret}`)
     expect(ret).to.be.equal(msg);
   });
 
+  it("Set status of collection 1 Token 1 and verify with get function", async function () {
+    let colid = 1;
+    let tid = 1;
+    let exp = 123242;
+    let lv = 2;
+    let status = [10,23,45,35,23,66];
+
+    let hashbytes = makeMessageBytes
+    (
+      Cont1.address,
+      await Cont1.nonce(Cont1.address),
+      colid,
+      tid,
+      exp,
+      lv,
+      status
+    );
+    let signature = await signer.signMessage(hashbytes);
+
+    let tx = await ContAdmin.setStatus(colid, tid, exp, lv, status, signature);
+    let r_exp, r_lv, r_status;
+    let ret = await ContAdmin.status(colid, tid);
+    [r_exp, r_lv, r_status] = ret;
+    expect(r_exp.toNumber()).to.be.equal(exp);
+    expect(r_lv).to.be.equal(lv);
+    let testStatus = status;
+    for (let i = status.length ; i < 11 ; i++){
+      testStatus.push(0);
+    }
+    // 配列を比較する場合、eqaulではなくeqlを使うとうまくいくらしい
+    expect(r_status).to.be.eql(testStatus);
+     
+  });
+
 });
+
+
 

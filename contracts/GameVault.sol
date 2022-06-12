@@ -38,6 +38,8 @@ contract GameVault is AccessControl{
     // The bit position of `tokenId` in packed key
     uint256 private constant BITPOS_TOKEN_ID = 128;
 
+    // Mask of experience vault data slot (16bits)
+    uint256 private constant BITMASK_EXPERIENCE = (1 << 64) - 1;
     // Mask of level vault data slot (16bits)
     uint256 private constant BITMASK_LEVEL = (1 << 16) - 1;
     // Mask of status vault data slot (16bits)
@@ -210,6 +212,31 @@ contract GameVault is AccessControl{
         maxSupply_ = (packedUint >> BITPOS_MAX_SUPPLY) & BITMASK_COLLECTION_SLOT;
     }
 
+    function status(uint128 cID, uint128 tID) public virtual view returns(
+        uint64 exp,
+        uint16 lv,
+        uint16[11] memory status
+    ){
+        _checkCollectionId(cID);
+        return _status(cID, tID);
+    }
+
+    function _status(uint128 cID, uint128 tID) internal view returns(
+        uint64 exp,
+        uint16 lv,
+        uint16[11] memory status
+    ){
+        uint256 packedData = _packedStatusVault[_makePackedId(cID, tID)];
+        exp = uint64(packedData & BITMASK_EXPERIENCE);
+        lv = uint16((packedData >> BITPOS_LEVEL) & BITMASK_LEVEL);
+        for (uint i = 0 ; i < LENGTH_STATUS_SLOT ; i++){
+            status[i] =uint16( 
+                (packedData >> (BITPOS_STATUS_FIRST + i * BITLENGTH_STATUS_SLOT))
+                & BITMASK_STATUS_SLOT
+            );
+        }
+    }
+
     /**
      * @dev Set all status data internally.
      * Public interfce function must be allowed with sign by signer role account
@@ -238,7 +265,7 @@ contract GameVault is AccessControl{
         for (uint256 i ; i < len ; i++){
             packedData = 
                 packedData | 
-                (uint256(status[i]) << (BITPOS_STATUS_FIRST + BITMASK_STATUS_SLOT * i));
+                (uint256(status[i]) << (BITPOS_STATUS_FIRST + BITLENGTH_STATUS_SLOT * i));
         }
         return packedData;
     }

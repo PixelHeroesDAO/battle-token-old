@@ -34,7 +34,14 @@ key => Stored parameter(uint256) :
 
 keyを元にステータス情報の保存
 
-Message for signature : [wallet address]|[wallet nonce]|[Key]|[Function]
+### Message for signature to update status vault
+
+[wallet address(lower case)]|[wallet nonce]|[Exp]|[Lv]|[Status1]|[Status2]|...|[Status11]
+
+- Statusは11個に満たない場合、0で埋めて11個にする(コントラクト側には常に11個分のスロットが用意され初期値は0)。
+- それぞれの値は文字列とし、"|"をセパレータとする。
+- メッセージに全データを使う理由：例えばメッセージをnonceだけとした場合、意図的に低いガス代を設定してTxをpendingにすることで、未使用nonceの署名を入手することができる。この署名を使えばステータスを都合よく変更した新たなTxをコントラクトに対して直接実行できてしまう。コントラクトに書き込むデータすべてに対しての署名を用いることで、このような問題を防ぐことができる。
+
 
 ## Functions
 ### constructor

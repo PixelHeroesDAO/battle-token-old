@@ -10,10 +10,11 @@ const {deployContract, makeMessage, makeMessageBytes} = require("../test/helpers
 
 const nfts = [
   '0xE72323d7900f26d13093CaFE76b689964Cc99ffc',
+  '0xba6E421833F6C190a830Ce6E142685B3916c9BD0',
   '0xba6E421833F6C190a830Ce6E142685B3916c9BD0'
 ];
 
-const chainid = [137, 137];
+const chainid = [137, 137, 1];
 const _name = "GameVault";
 
 describe(`${_name} TEST`, function () {
@@ -53,24 +54,40 @@ describe(`${_name} TEST`, function () {
 
   });
 
-  it("Add Collections", async function () { 
-    let tx = await ContAdmin["addCollection(uint256,address)"](chainid[0],nfts[0]);
-    await tx.wait();
-    tx = await ContAdmin["addCollection(uint256,address)"](chainid[1],nfts[1]);
-    await tx.wait();
+  it("Add Collections", async function () {
+    let tx;
+    for (let i = 0; i < chainid.length; i ++){
+      tx = await ContAdmin["addCollection(uint24,address)"](chainid[i],nfts[i]);
+      await tx.wait();
+    } 
     const ret = await Cont1.totalCollection();
     console.log(`        totalCollection : ${ret}`);
+    expect(ret).to.be.equal(chainid.length);
   });
 
   it("Get information of the collections", async function () { 
     let cid, addr, serial, startId, maxSupply;
     let ret;
-    for (let colid = 1; colid <= 2 ; colid++){
+    for (let colid = 1; colid <= 3 ; colid++){
         ret = await ContAdmin.collection(colid);
         [cid, addr, serial, startId, maxSupply] = ret;
         expect(cid).to.be.equal(chainid[colid-1]);
         expect(addr).to.be.equal(nfts[colid-1]);
-        console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId.toNumber(), maxSupply.toNumber());
+        console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId, maxSupply);
+    
+    }
+  });
+
+  it("Change the supply of the collection", async function () { 
+    let cid, addr, serial, startId, maxSupply;
+    let ret;
+    //修正中
+    for (let colid = 1; colid <= 3 ; colid++){
+        ret = await ContAdmin.collection(colid);
+        [cid, addr, serial, startId, maxSupply] = ret;
+        expect(cid).to.be.equal(chainid[colid-1]);
+        expect(addr).to.be.equal(nfts[colid-1]);
+        console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId, maxSupply);
     
     }
   });

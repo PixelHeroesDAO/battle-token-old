@@ -94,7 +94,8 @@ contract GameVault is AccessControl{
     // 登録済みコレクション数
     uint128 private _totalCollection;
     // イベント
-    event AddCollection(uint256 indexed collectionId, uint24 chainId, address addr);
+    event AddCollection(uint128 indexed collectionId, uint24 chainId, address addr);
+    event SetStatus(uint128 indexed collectionId, uint128 indexed tokenId, uint256 packedStatus);
 
     //エラー関数
     // 存在しないコレクションへの参照
@@ -124,18 +125,18 @@ contract GameVault is AccessControl{
      * @param maxSupply_ is only used when isSerial is true. Otherwise assign 0. uint24 internally.
      */
     function addCollection(
-        uint256 chainId_, 
+        uint24 chainId_, 
         address addr_, 
         bool isSerial_,
-        uint256 startId_,
-        uint256 maxSupply_
+        uint24 startId_,
+        uint24 maxSupply_
     ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
         return _addCollection(
-            uint24(chainId_), 
+            chainId_, 
             addr_, 
             isSerial_, 
-            uint24(startId_), 
-            uint24(maxSupply_)
+            startId_, 
+            maxSupply_
         );
     }
 
@@ -146,10 +147,10 @@ contract GameVault is AccessControl{
      * @param addr_     NFTコントラクトアドレス
      */
     function addCollection(
-        uint256 chainId_, 
+        uint24 chainId_, 
         address addr_
     ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
-        return _addCollection(uint24(chainId_), addr_, false, uint24(0), uint24(0));
+        return _addCollection(chainId_, addr_, false, uint24(0), uint24(0));
     }
 
     /**
@@ -176,7 +177,7 @@ contract GameVault is AccessControl{
         }
         _totalCollection += 1;
         _packedCollection[newId] = packedData;
-        emit AddCollection(newId, chainId_, addr_);
+        emit AddCollection(uint128(newId), chainId_, addr_);
         return newId;
     }
 
@@ -196,8 +197,8 @@ contract GameVault is AccessControl{
         uint256 chainId_, 
         address addr_, 
         bool isSerial_, 
-        uint256 startId_, 
-        uint256 maxSupply_
+        uint24 startId_, 
+        uint24 maxSupply_
     ){
         _checkCollectionId(cID);
         uint256 packedUint = _packedCollection[cID];
@@ -208,9 +209,36 @@ contract GameVault is AccessControl{
         } else {
             isSerial_ = true;
         }
-        startId_ = (packedUint >> BITPOS_START_ID) & BITMASK_COLLECTION_SLOT;
-        maxSupply_ = (packedUint >> BITPOS_MAX_SUPPLY) & BITMASK_COLLECTION_SLOT;
+        startId_ = uint24((packedUint >> BITPOS_START_ID) & BITMASK_COLLECTION_SLOT);
+        maxSupply_ = uint24((packedUint >> BITPOS_MAX_SUPPLY) & BITMASK_COLLECTION_SLOT);
     }
+
+    function changeCollectionSupply(
+        uint128 cID, 
+        bool isSerial_, 
+        uint256 startId_, 
+        uint256 maxSupply_)
+    public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(bool) {
+        _checkCollectionId(cID);
+        return _changeCollectionSupply(cID, isSerial_, startId_, maxSupply_);
+    }
+
+    function _changeCollectionSupply(
+        uint128 cID_, 
+        bool isSerial_, 
+        uint256 startId_, 
+        uint256 maxSupply_)
+    internal virtual returns(bool) {
+        uint256 packedData = _packedCollection[cID_] & ((1 << BITPOS_IS_SERIAL)-1);
+        if (isSerial_){
+            packedData = packedData |
+                (uint256(maxSupply_) << BITPOS_MAX_SUPPLY) |
+                (uint256(startId_) << BITPOS_START_ID) |
+                (UINT_TRUE << BITPOS_IS_SERIAL);
+        }
+        _packedCollection[cID_] = packedData;
+        return true;
+   }
 
     function status(uint128 cID, uint128 tID) public virtual view returns(
         uint64 exp,
@@ -251,6 +279,7 @@ contract GameVault is AccessControl{
     {
         _checkCollectionId(cID);
         _packedStatusVault[_makePackedId(cID, tID)] = packedData;
+        emit SetStatus(cID, tID, packedData);
         return true;
     }
 
@@ -275,14 +304,14 @@ contract GameVault is AccessControl{
     }
 
     /**
-     * Test function for setStatus
+     * @dev Public setting status function with signature by signer role.
+     * @param cID       Collection ID
+     * @param tID       Token ID
+     * @param exp       Experience to be set
+     * @param lv        Level to be set
+     * @param status[]  Array of status. Max length is 11.
+     * @param signature Signed message by signer role accouunt.
      */
-    function TEST_setStatus(uint128 cID, uint128 tID, uint64 exp, uint16 lv, uint16[] memory status)
-        public returns(bool)
-    {
-        return _setStatus(cID, tID, _makePackedStatus(exp, lv, status));
-    }
-
     function setStatus(
         uint128 cID, 
         uint128 tID, 
@@ -302,6 +331,7 @@ contract GameVault is AccessControl{
         if (cID == 0) revert ReferZeroCollection();
         return true;
     }
+
     /**
      * @dev Check status data. This function is called before storing data.
      *      Default implementation is nothing.

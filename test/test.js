@@ -150,6 +150,39 @@ describe(`${_name} TEST`, function () {
      
   });
 
+  it("Get collection status about disable", async function(){
+    let ret;
+    for (let i = 1 ; i <= 3 ; i++){
+      ret = await Cont1.collectionDisable(i);
+      console.log(`        Collection Disable of ID=${i}:${ret}`);
+      expect(ret).to.be.equal(false);
+    }
+  });
+
+  it("Set collection status to disable of ID = 3", async function(){
+    let ret;
+    let colid = 3;
+    const resExpect = [false, false, true];
+    ret = await ContAdmin.setDisable(colid);
+    for (let i = 1 ; i <= 3 ; i++){
+      ret = await Cont1.collectionDisable(i);
+      console.log(`        Collection Disable of ID=${i}:${ret}`);
+      expect(ret).to.be.equal(resExpect[i-1]);
+    }
+  });
+
+  it("Set collection status to enable of ID = 3", async function(){
+    let ret;
+    let colid = 3;
+    const resExpect = [false, false, false];
+    ret = await ContAdmin.setEnable(colid);
+    for (let i = 1 ; i <= 3 ; i++){
+      ret = await Cont1.collectionDisable(i);
+      console.log(`        Collection Disable of ID=${i}:${ret}`);
+      expect(ret).to.be.equal(resExpect[i-1]);
+    }
+  });
+
   it("Revert test : Operate collection by non-admin user", async function(){
     await expect(Cont1["addCollection(uint24,address,bool,uint24,uint24)"](chainid[0], nfts[0], true,1,100))
       .to.be.revertedWith('missing role');
@@ -163,6 +196,8 @@ describe(`${_name} TEST`, function () {
       .to.be.revertedWith('ReferZeroCollection');
   });
 
+
+  
 });
 
 

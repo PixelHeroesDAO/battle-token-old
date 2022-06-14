@@ -188,6 +188,7 @@ contract GameVault is AccessControl{
         }
         _totalCollection += 1;
         _packedCollection[newId] = packedData;
+        _initDisable(uint128(newId));
         emit AddCollection(uint128(newId), chainId_, addr_);
         return newId;
     }
@@ -258,9 +259,9 @@ contract GameVault is AccessControl{
      *      0など_totalCollection以下の値を指定すると、_totalCollectionで初期化を試す。
      *      1を超える配列拡張になる場合エラーを返す。
      */
-    function _initDisable(uint256 cID) internal virtual {
-        uint256 id = _totalCollection;
-        uint256 len = _collectionDisable.length;
+    function _initDisable(uint128 cID) internal virtual {
+        uint128 id = _totalCollection;
+        uint128 len = uint128(_collectionDisable.length);
         if (cID > id) id = cID;
         if(id > 256 * len){
             if(id <= 256 * (len + 1)) {
@@ -275,19 +276,56 @@ contract GameVault is AccessControl{
      * @dev 指定のコレクションIDを無効にする
      *
      */
-    function _setDisable(uint256 cID) internal virtual {
-        uint256 id = _totalCollection;
+    function _setDisable(uint128 cID) internal virtual {
+        uint128 id = _totalCollection;
         if (id > cID) id = cID;
         // コレクションIDは1スタートだが配列は0スタートなのでずらす
         id--;
-        uint256 index = id / 256 + 1;
-        uint256 bit = id % 256;
-        //修正中
+        uint256 index = id / 256;
+        uint256 op = ~ (1 << (id % 256));
         uint256 data = _collectionDisable[index];
-        data 
-
+        _collectionDisable[index] = ~ ((~ data) & op);
     }
 
+    /**
+     * @dev 指定のコレクションIDを有効にする
+     *
+     */
+    function _setEnable(uint128 cID) internal virtual {
+        uint128 id = _totalCollection;
+        if (id > cID) id = cID;
+        // コレクションIDは1スタートだが配列は0スタートなのでずらす
+        id--;
+        uint256 index = id / 256;
+        uint256 op = ~ (1 << (id % 256));
+        uint256 data = _collectionDisable[index];
+        _collectionDisable[index] = data & op;
+    }
+
+    function setDisable(uint128 cID) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setDisable(cID);
+    }
+
+    function setEnable(uint128 cID) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setEnable(cID);
+    }
+
+    /**
+     * @dev 指定のコレクションIDを有効にする
+     *
+     */
+    function collectionDisable(uint128 cID) public view returns(bool) {
+        _checkCollectionId(cID);
+        // コレクションIDは1スタートだが配列は0スタートなのでずらす
+        uint128 id = cID - 1;
+        uint256 index = id / 256;
+        uint256 data = _collectionDisable[index];
+        if ((data >> (id % 256)) & 1 == UINT_ENABLE){
+            return false;
+        }else{
+            return true;
+        }
+    }
     function status(uint128 cID, uint128 tID) public virtual view returns(
         uint64 exp,
         uint16 lv,

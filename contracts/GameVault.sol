@@ -115,6 +115,8 @@ contract GameVault is AccessControl{
     error SetOutSizedStatus();
     // 不正な署名による操作
     error OperateWithInvalidSignature();
+    // コレクション無効性の初期化失敗
+    error FailInitializingCollectionDisable();
 
 
     constructor (string memory ver_) {
@@ -249,7 +251,42 @@ contract GameVault is AccessControl{
         }
         _packedCollection[cID_] = packedData;
         return true;
-   }
+    }
+    /**
+     * @dev コレクションの無効性を初期化。
+     *      256区切りを超えるIDが指定された場合に配列を拡張する。
+     *      0など_totalCollection以下の値を指定すると、_totalCollectionで初期化を試す。
+     *      1を超える配列拡張になる場合エラーを返す。
+     */
+    function _initDisable(uint256 cID) internal virtual {
+        uint256 id = _totalCollection;
+        uint256 len = _collectionDisable.length;
+        if (cID > id) id = cID;
+        if(id > 256 * len){
+            if(id <= 256 * (len + 1)) {
+                _collectionDisable.push(0);
+            } else {
+                revert FailInitializingCollectionDisable();
+            }
+        }
+    }
+
+    /**
+     * @dev 指定のコレクションIDを無効にする
+     *
+     */
+    function _setDisable(uint256 cID) internal virtual {
+        uint256 id = _totalCollection;
+        if (id > cID) id = cID;
+        // コレクションIDは1スタートだが配列は0スタートなのでずらす
+        id--;
+        uint256 index = id / 256 + 1;
+        uint256 bit = id % 256;
+        //修正中
+        uint256 data = _collectionDisable[index];
+        data 
+
+    }
 
     function status(uint128 cID, uint128 tID) public virtual view returns(
         uint64 exp,

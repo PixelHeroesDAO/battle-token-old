@@ -57,6 +57,10 @@ contract GameVault is AccessControl{
     uint256 private constant UINT_TRUE = 1;
     uint256 private constant UINT_FALSE = 0;
 
+    // uint bool
+    uint256 private constant UINT_DISABLE = 1;
+    uint256 private constant UINT_ENABLE = 0;
+
     // AccessControl関係
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
@@ -91,6 +95,11 @@ contract GameVault is AccessControl{
     // wallet nonce for status updating transaction
     mapping(address => uint256) public nonce;
 
+    // コレクションの無効性
+    // uint256の動的配列として1コレクション1bitを使う。また登録時有効をデフォルト値とするため
+    // 0:有効　1:無効　とする(Disableがfalse or true)
+    uint256[] private _collectionDisable;
+    
     // 登録済みコレクション数
     uint128 private _totalCollection;
     // イベント
@@ -229,7 +238,9 @@ contract GameVault is AccessControl{
         uint256 startId_, 
         uint256 maxSupply_)
     internal virtual returns(bool) {
+        //isSerialの前のパックデータを抽出する
         uint256 packedData = _packedCollection[cID_] & ((1 << BITPOS_IS_SERIAL)-1);
+        //iSSerialがtrueの場合、パックデータに追記する
         if (isSerial_){
             packedData = packedData |
                 (uint256(maxSupply_) << BITPOS_MAX_SUPPLY) |

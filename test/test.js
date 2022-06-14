@@ -80,16 +80,18 @@ describe(`${_name} TEST`, function () {
 
   it("Change the supply of the collection", async function () { 
     let cid, addr, serial, startId, maxSupply;
-    let ret;
-    //修正中
-    for (let colid = 1; colid <= 3 ; colid++){
-        ret = await ContAdmin.collection(colid);
-        [cid, addr, serial, startId, maxSupply] = ret;
-        expect(cid).to.be.equal(chainid[colid-1]);
-        expect(addr).to.be.equal(nfts[colid-1]);
-        console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId, maxSupply);
-    
-    }
+    const colid = 3;
+    const new_serial = true;
+    const new_startId = 1;
+    const new_supply = 1000;
+    let ret = await ContAdmin.changeCollectionSupply(colid,new_serial,new_startId,new_supply);
+    ret = await ContAdmin.collection(colid);
+    [cid, addr, serial, startId, maxSupply] = ret;
+    expect(serial).to.be.equal(new_serial);
+    expect(startId).to.be.equal(new_startId);
+    expect(maxSupply).to.be.equal(new_supply);
+    console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId, maxSupply);
+  
   });
 
   it("Testing make message", async function () {
@@ -146,6 +148,19 @@ describe(`${_name} TEST`, function () {
     // 配列を比較する場合、eqaulではなくeqlを使うとうまくいくらしい
     expect(r_status).to.be.eql(testStatus);
      
+  });
+
+  it("Revert test : Operate collection by non-admin user", async function(){
+    await expect(Cont1["addCollection(uint24,address,bool,uint24,uint24)"](chainid[0], nfts[0], true,1,100))
+      .to.be.revertedWith('missing role');
+    await expect(Cont2.changeCollectionSupply(1,true,12,56)).to.be.revertedWith('missing role');
+  });
+
+  it("Revert test :Access invalid collection ID", async function(){
+    await expect(Cont1.collection(10))
+      .to.be.revertedWith('ReferNonexistentCollection');
+      await expect(Cont1.collection(0))
+      .to.be.revertedWith('ReferZeroCollection');
   });
 
 });

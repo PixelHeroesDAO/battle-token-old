@@ -60,9 +60,13 @@ describe(`${_name} TEST`, function () {
       tx = await ContAdmin["addCollection(uint24,address)"](chainid[i],nfts[i]);
       await tx.wait();
     } 
+    for (i = 0; i < 256 ; i++){
+      tx = await ContAdmin["addCollection(uint24,address)"](i+2,nfts[2]);
+      await tx.wait();
+    }
     const ret = await Cont1.totalCollection();
     console.log(`        totalCollection : ${ret}`);
-    expect(ret).to.be.equal(chainid.length);
+    expect(ret).to.be.equal(259);
   });
 
   it("Get information of the collections", async function () { 
@@ -183,6 +187,45 @@ describe(`${_name} TEST`, function () {
     }
   });
 
+  it("Set collection status to disable of ID = 254 - 257(beyond boundary of array)", async function(){
+    let ret;
+    const resExpect = [false, true, true, true, true, false];
+    for (let i = 254 ; i <= 257 ; i++){
+      ret = await ContAdmin.setDisable(i);
+    }
+    for (let i = 253 ; i <= 258 ; i++){
+      ret = await Cont1.collectionDisable(i);
+      console.log(`        Collection Disable of ID=${i}:${ret}`);
+      expect(ret).to.be.equal(resExpect[i-253]);
+    }
+  });
+
+  it("Revert test : Set status of disable collection ", async function () {
+    let colid = 3;
+    let tid = 1;
+    let exp = 123242;
+    let lv = 2;
+    let status = [10,23,45,35,23,66];
+
+    let ret = await ContAdmin.setDisable(colid);
+
+    let hashbytes = makeMessageBytes
+    (
+      Cont1.address,
+      await Cont1.nonce(Cont1.address),
+      colid,
+      tid,
+      exp,
+      lv,
+      status
+    );
+    let signature = await signer.signMessage(hashbytes);
+
+    await expect(ContAdmin.setStatus(colid, tid, exp, lv, status, signature)).to.be.revertedWith('CollectionIsDisable');
+     
+  });
+  
+
   it("Revert test : Operate collection by non-admin user", async function(){
     await expect(Cont1["addCollection(uint24,address,bool,uint24,uint24)"](chainid[0], nfts[0], true,1,100))
       .to.be.revertedWith('missing role');
@@ -190,7 +233,7 @@ describe(`${_name} TEST`, function () {
   });
 
   it("Revert test :Access invalid collection ID", async function(){
-    await expect(Cont1.collection(10))
+    await expect(Cont1.collection(300))
       .to.be.revertedWith('ReferNonexistentCollection');
       await expect(Cont1.collection(0))
       .to.be.revertedWith('ReferZeroCollection');

@@ -117,6 +117,8 @@ contract GameVault is AccessControl{
     error OperateWithInvalidSignature();
     // コレクション無効性の初期化失敗
     error FailInitializingCollectionDisable();
+    // コレクションが無効化されている
+    error CollectionIsDisable();
 
 
     constructor (string memory ver_) {
@@ -326,6 +328,13 @@ contract GameVault is AccessControl{
             return true;
         }
     }
+
+    /**
+     * @dev 指定のコレクションIDの有効無効を確認、無効ならrevertする。
+     */
+    function _checkDisable(uint128 cID) internal view returns(bool){
+        if (collectionDisable(cID)) revert CollectionIsDisable();
+    }
     function status(uint128 cID, uint128 tID) public virtual view returns(
         uint64 exp,
         uint16 lv,
@@ -363,7 +372,6 @@ contract GameVault is AccessControl{
     function _setStatus(uint128 cID, uint128 tID, uint256 packedData)
         internal returns(bool)
     {
-        _checkCollectionId(cID);
         _packedStatusVault[_makePackedId(cID, tID)] = packedData;
         emit SetStatus(cID, tID, packedData);
         return true;
@@ -408,6 +416,7 @@ contract GameVault is AccessControl{
         ) external
     {
         _checkStatus(exp, lv, status);
+        _checkDisable(cID);
         _verifySigner(_makeMessage(msg.sender, cID, tID, exp, lv, status), signature);
         _setStatus(cID, tID, _makePackedStatus(exp, lv, status));
     }

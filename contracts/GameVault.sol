@@ -418,7 +418,12 @@ contract GameVault is AccessControl{
         _checkStatus(exp, lv, status);
         _checkDisable(cID);
         _verifySigner(_makeMessage(msg.sender, cID, tID, exp, lv, status), signature);
+        _increaseNonce(msg.sender);
         _setStatus(cID, tID, _makePackedStatus(exp, lv, status));
+    }
+
+    function _increaseNonce(address addr) internal {
+        nonce[addr]++;
     }
 
     function _checkCollectionId(uint128 cID) internal virtual view returns(bool){

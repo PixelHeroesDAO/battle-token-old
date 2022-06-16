@@ -2,7 +2,8 @@ const { expect, assert } = require("chai");
 const { BigNumber } = require("ethers");
 const { ethers } = require("hardhat");
 const { string } = require("hardhat/internal/core/params/argumentTypes");
-const artifacts = require("../artifacts/contracts/GameVault.sol/GameVault.json");
+//const artifacts = require("../artifacts/contracts/GameVault.sol/GameVault.json");
+const artifacts = require("../artifacts/contracts/PHBattleVault.sol/PHBattleVault.json");
 const artifactsPH = require("../artifacts/contracts/NFT/PixelHeroes.sol/PixelHeroes.json");
 
 const {deployContract, makeMessage, makeMessageBytes} = require("../test/helpers");
@@ -15,7 +16,8 @@ const nfts = [
 ];
 
 const chainid = [137, 137, 1];
-const _name = "GameVault";
+//const _name = "GameVault";
+const _name = "PHBattleVault";
 
 describe(`${_name} TEST`, function () {
 
@@ -27,7 +29,7 @@ describe(`${_name} TEST`, function () {
 
   it(`${_name} Contract Deploy`, async function () { 
     [admin, signer, user1, user2, user3] = await ethers.getSigners();
-    ContAdmin = await deployContract("GameVault", ["V1"]);
+    ContAdmin = await deployContract(_name, ["alpha1"]);
     let tx = await ContAdmin.deployTransaction;
     thisChainId = tx.chainId;
     console.log("        Chain ID : ", thisChainId);

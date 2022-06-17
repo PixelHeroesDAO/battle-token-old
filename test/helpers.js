@@ -29,5 +29,29 @@ const makeMessage = function(addr, nonce, cid, tid, exp, lv, status){
 const makeMessageBytes = function(addr, nonce, cid, tid, exp, lv, status) {
   return ethers.utils.arrayify(ethers.utils.id(makeMessage(addr, nonce, cid, tid, exp, lv, status)));
 }
+const makeMsgExp = function(addr, nonce, cid, tid, dExp, inc){
+  let sgn = "+";
+  if (!inc) sgn = "-";
+  let msg = String(addr).toLowerCase() + "|" +
+  String(nonce) + "|" +
+  String(cid) + "|" +
+  String(tid) + "|" +
+  sgn + String(dExp)
+  return msg;
+}
 
-module.exports = { deployContract, makeMessage, makeMessageBytes};
+const makeMsgExpBytes = function(addr, nonce, cid, tid, dExp, inc) {
+  return ethers.utils.arrayify(ethers.utils.id(makeMsgExp(addr, nonce, cid, tid, dExp, inc)));
+}
+const helpers={
+  deployContract : deployContract,
+  Message : makeMessage,
+  MessageBytes : makeMessageBytes,
+  MsgExp : makeMsgExp,
+  MsgExpBytes : makeMsgExpBytes
+}
+
+
+
+//module.exports = { deployContract, makeMessage, makeMessageBytes};
+module.exports = { helpers };

@@ -338,7 +338,7 @@ contract GameVault is AccessControl{
     function status(uint128 cID, uint128 tID) public virtual view returns(
         uint64 exp,
         uint16 lv,
-        uint16[11] memory status
+        uint16[] memory slot
     ){
         _checkCollectionId(cID);
         return _status(cID, tID);
@@ -347,13 +347,15 @@ contract GameVault is AccessControl{
     function _status(uint128 cID, uint128 tID) internal view returns(
         uint64 exp,
         uint16 lv,
-        uint16[11] memory status
+        uint16[] memory slot
     ){
+        //戻り値に動的配列形式を使うため、配列サイズを予め定義する（memoryは可変できない）
+        slot = new uint16[](LENGTH_STATUS_SLOT);
         uint256 packedData = _packedStatusVault[_makePackedId(cID, tID)];
         exp = uint64(packedData & BITMASK_EXPERIENCE);
         lv = uint16((packedData >> BITPOS_LEVEL) & BITMASK_LEVEL);
         for (uint i = 0 ; i < LENGTH_STATUS_SLOT ; i++){
-            status[i] =uint16( 
+            slot[i] =uint16( 
                 (packedData >> (BITPOS_STATUS_FIRST + i * BITLENGTH_STATUS_SLOT))
                 & BITMASK_STATUS_SLOT
             );

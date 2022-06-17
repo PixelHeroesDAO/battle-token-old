@@ -6,7 +6,7 @@ const { string } = require("hardhat/internal/core/params/argumentTypes");
 const artifacts = require("../artifacts/contracts/PHBattleVault.sol/PHBattleVault.json");
 const artifactsPH = require("../artifacts/contracts/NFT/PixelHeroes.sol/PixelHeroes.json");
 
-const {deployContract, makeMessage, makeMessageBytes} = require("../test/helpers");
+const {helpers} = require("../test/helpers");
 
 
 const nfts = [
@@ -29,7 +29,7 @@ describe(`${_name} TEST`, function () {
 
   it(`${_name} Contract Deploy`, async function () { 
     [admin, signer, user1, user2, user3] = await ethers.getSigners();
-    ContAdmin = await deployContract(_name, ["alpha1"]);
+    ContAdmin = await helpers.deployContract(_name, ["alpha1"]);
     let tx = await ContAdmin.deployTransaction;
     thisChainId = tx.chainId;
     console.log("        Chain ID : ", thisChainId);
@@ -108,7 +108,7 @@ describe(`${_name} TEST`, function () {
     let status = [10,23,45,35,23,66];
 
     let ret = await Cont1.TEST_makeMessage(Cont1.address,colid,tid,exp,lv,status);
-    let msg = makeMessage
+    let msg = helpers.Message
     (
       Cont1.address,
       await Cont1.nonce(Cont1.address),
@@ -129,7 +129,7 @@ describe(`${_name} TEST`, function () {
     let lv = 2;
     let status = [10,23,45,35,23,66];
 
-    let hashbytes = makeMessageBytes
+    let hashbytes = helpers.MessageBytes
     (
       Cont1.address,
       await Cont1.nonce(Cont1.address),
@@ -211,7 +211,7 @@ describe(`${_name} TEST`, function () {
 
     let ret = await ContAdmin.setDisable(colid);
 
-    let hashbytes = makeMessageBytes
+    let hashbytes = helpers.MessageBytes
     (
       Cont1.address,
       await Cont1.nonce(Cont1.address),
@@ -241,7 +241,62 @@ describe(`${_name} TEST`, function () {
       .to.be.revertedWith('ReferZeroCollection');
   });
 
+  it("Increment Exp for collection 1 Token 1", async function () {
+    let colid = 1;
+    let tid = 1;
+    let dExp = 324;
+    let inc = true;
 
+    let r_exp_org, r_lv, r_status;
+    let ret = await ContAdmin.status(colid, tid);
+    [r_exp_org, , ] = ret;
+
+
+    let hashbytes = helpers.MsgExpBytes
+    (
+      Cont1.address,
+      await Cont1.nonce(Cont1.address),
+      colid,
+      tid,
+      dExp,
+      inc
+    );
+    let signature = await signer.signMessage(hashbytes);
+
+    await ContAdmin.increaseExp(colid, tid, dExp, signature);
+    ret = await ContAdmin.status(colid, tid);
+    [r_exp, r_lv, r_status] = ret;
+    expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() + dExp);
+     
+  });
+  it("Increment Exp for collection 1 Token 1", async function () {
+    let colid = 1;
+    let tid = 1;
+    let dExp = 4220;
+    let inc = false;
+
+    let r_exp_org, r_lv, r_status;
+    let ret = await ContAdmin.status(colid, tid);
+    [r_exp_org, , ] = ret;
+
+
+    let hashbytes = helpers.MsgExpBytes
+    (
+      Cont1.address,
+      await Cont1.nonce(Cont1.address),
+      colid,
+      tid,
+      dExp,
+      inc
+    );
+    let signature = await signer.signMessage(hashbytes);
+
+    await ContAdmin.decreaseExp(colid, tid, dExp, signature);
+    ret = await ContAdmin.status(colid, tid);
+    [r_exp, r_lv, r_status] = ret;
+    expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() - dExp);
+     
+  });
   
 });
 

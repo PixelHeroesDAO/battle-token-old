@@ -37,11 +37,9 @@ contract PHBattleVault is GameVault{
         _checkCollectionId(cID);
         uint64 exp; 
         uint16 lv;
-        uint16[11] memory slot;
+        //戻り値動的配列に合わせる
+        uint16[] memory slot;
         (exp, lv, slot) = _status(cID, tID);
-        //動的配列に静的配列を渡せない。関数内では配列のリサイズはできないので、
-        //newを使って予めサイズを設定する。
-        uint16[] memory slot_out = new uint16[](11);
         if (inc) {
             if (exp + dExp > type(uint64).max) revert ExperienceOverFlow();   
             exp = exp + dExp;
@@ -49,14 +47,11 @@ contract PHBattleVault is GameVault{
             if (exp < dExp) revert ExperienceUnderFlow();
             exp = exp - dExp;
         }
-        for(uint i = 0; i < 11 ; i++){
-            slot_out[i]=slot_out[i];
-        }
-        _checkStatus(exp, lv, slot_out);
+        _checkStatus(exp, lv, slot);
         _checkDisable(cID);
         _verifySigner(_makeMsgExp(msg.sender, cID, tID, dExp, inc), signature);
         _increaseNonce(msg.sender);
-        _setStatus(cID, tID, _makePackedStatus(exp, lv, slot_out));
+        _setStatus(cID, tID, _makePackedStatus(exp, lv, slot));
 
     }
 
@@ -78,7 +73,11 @@ contract PHBattleVault is GameVault{
         bool inc
     )internal view virtual returns (string memory){
         string memory sgn;
-        if (!inc) sgn = "-";
+        if (inc) {
+            sgn = "+";
+        }else{
+            sgn = "-";
+        }
         string memory ret = string(abi.encodePacked(
             "0x",
             addr.toAsciiString(), "|", 

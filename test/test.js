@@ -24,12 +24,12 @@ const _name = "PHBattleVault";
 describe(`${_name} TEST`, function () {
 
   let admin, signer, user1, user2, user3;
-  let addr; //コントラクトアドレス
+  let addr, addrToken, addrEx; //コントラクトアドレス
   let thisChainId;
   let idPHS, idPHX;
   let ContAdmin, Cont1, Cont2, Cont3;
   let tokenAdmin;
-  let exAdmin;
+  let exAdmin, ex1;
 
   it(`${_name} Contract Deploy`, async function () { 
     let tx;
@@ -44,23 +44,26 @@ describe(`${_name} TEST`, function () {
     tokenAdmin = await helpers.deployContract("PHGameToken");
     tx = await tokenAdmin.deployTransaction;
     console.log(`        PHGameToken Deplyed to :`, tokenAdmin.address);
+    addrToken = tokenAdmin.address;
     exAdmin = await helpers.deployContract("PHGameExchange");
     tx = await exAdmin.deployTransaction;
     console.log(`        PHGameExchange Deplyed to :`, exAdmin.address);
-    exAdmin.setVault(ContAdmin.address);
-    exAdmin.setToken(tokenAdmin.address);
+    addrEx = exAdmin.address;
+    exAdmin.setVault(addr);
+    exAdmin.setToken(addrToken);
   });
 
   it(`Set signer role`, async function () {
     let tx = await ContAdmin.grantRole(await ContAdmin.SIGNER_ROLE(), signer.address);
     expect(await ContAdmin.hasRole(await ContAdmin.SIGNER_ROLE(), signer.address)).to.be.equal(true);
+    console.log("        signer address : ", signer.address);
   })
 
   it("Set User Wallet", async function () { 
     Cont1 = await new ethers.Contract(addr, artifacts.abi, user1);
     Cont2 = await new ethers.Contract(addr, artifacts.abi, user2);
     Cont3 = await new ethers.Contract(addr, artifacts.abi, user3);
-
+    ex1 = await new ethers.Contract(addrEx, artifactsEx.abi, user1);
   });
 
   it("Get totalCollection", async function () { 
@@ -120,11 +123,11 @@ describe(`${_name} TEST`, function () {
     let lv = 2;
     let status = [10,23,45,35,23,66];
 
-    let ret = await Cont1.TEST_makeMessage(Cont1.address,colid,tid,exp,lv,status);
+    let ret = await Cont1.TEST_makeMessage(user1.address,colid,tid,exp,lv,status);
     let msg = helpers.Message
     (
-      Cont1.address,
-      await Cont1.nonce(Cont1.address),
+      user1.address,
+      await Cont1.nonce(user1.address),
       colid,
       tid,
       exp,
@@ -144,8 +147,8 @@ describe(`${_name} TEST`, function () {
 
     let hashbytes = helpers.MessageBytes
     (
-      Cont1.address,
-      await Cont1.nonce(Cont1.address),
+      user1.address,
+      await Cont1.nonce(user1.address),
       colid,
       tid,
       exp,
@@ -154,9 +157,9 @@ describe(`${_name} TEST`, function () {
     );
     let signature = await signer.signMessage(hashbytes);
 
-    let tx = await ContAdmin.setStatus(colid, tid, exp, lv, status, signature);
+    let tx = await Cont1.setStatus(colid, tid, exp, lv, status, signature);
     let r_exp, r_lv, r_status;
-    let ret = await ContAdmin.status(colid, tid);
+    let ret = await Cont1.status(colid, tid);
     [r_exp, r_lv, r_status] = ret;
     expect(r_exp.toNumber()).to.be.equal(exp);
     expect(r_lv).to.be.equal(lv);
@@ -226,8 +229,8 @@ describe(`${_name} TEST`, function () {
 
     let hashbytes = helpers.MessageBytes
     (
-      Cont1.address,
-      await Cont1.nonce(Cont1.address),
+      user1.address,
+      await Cont1.nonce(user1.address),
       colid,
       tid,
       exp,
@@ -267,8 +270,8 @@ describe(`${_name} TEST`, function () {
 
     let hashbytes = helpers.MsgExpBytes
     (
-      Cont1.address,
-      await Cont1.nonce(Cont1.address),
+      user1.address,
+      await Cont1.nonce(user1.address),
       colid,
       tid,
       dExp,
@@ -276,13 +279,13 @@ describe(`${_name} TEST`, function () {
     );
     let signature = await signer.signMessage(hashbytes);
 
-    await ContAdmin.increaseExp(colid, tid, dExp, signature);
-    ret = await ContAdmin.status(colid, tid);
+    await Cont1.increaseExp(colid, tid, dExp, signature);
+    ret = await Cont1.status(colid, tid);
     [r_exp, r_lv, r_status] = ret;
     expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() + dExp);
      
   });
-  it("Increment Exp for collection 1 Token 1", async function () {
+  it("Decrement Exp for collection 1 Token 1", async function () {
     let colid = 1;
     let tid = 1;
     let dExp = 4220;
@@ -295,7 +298,30 @@ describe(`${_name} TEST`, function () {
 
     let hashbytes = helpers.MsgExpBytes
     (
-      Cont1.address,
+      user1.address,
+      await Cont1.nonce(user1.address),
+      colid,
+      tid,
+      dExp,
+      inc
+    );
+    let signature = await signer.signMessage(hashbytes);
+
+    await Cont1.decreaseExp(colid, tid, dExp, signature);
+    ret = await Cont1.status(colid, tid);
+    [r_exp, r_lv, r_status] = ret;
+    expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() - dExp);
+     
+  });
+/*
+  it("", async function () {
+    let colid = 1;
+    let tid = 1;
+    let dExp = 1100;
+
+    let hashbytes = helpers.MsgExpBytes
+    (
+      User.ddress,
       await Cont1.nonce(Cont1.address),
       colid,
       tid,
@@ -309,7 +335,7 @@ describe(`${_name} TEST`, function () {
     [r_exp, r_lv, r_status] = ret;
     expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() - dExp);
      
-  });
+  });*/
   
 });
 

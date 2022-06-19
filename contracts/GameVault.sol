@@ -500,8 +500,9 @@ contract GameVault is AccessControl{
     function _verifySigner(string memory message, bytes memory signature )
         internal view returns(bool)
     {
+        console.log(RecoverSigner.recoverSignerByMsg(message, signature));
         //署名検証
-        if(hasRole(SIGNER_ROLE, RecoverSigner.recoverSignerByMsg(message, signature))) 
+        if(!hasRole(SIGNER_ROLE, RecoverSigner.recoverSignerByMsg(message, signature))) 
             revert OperateWithInvalidSignature();
         return true;
     }

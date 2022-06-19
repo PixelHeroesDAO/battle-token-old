@@ -1,7 +1,7 @@
 pragma solidity ^0.8.4;
 
-import "@opnezeppelin/contract/token/ERC20/ERC20.sol";
-import "@openzeppelin/contract/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract PHGameToken is ERC20, AccessControl{
     // AccessControl関係

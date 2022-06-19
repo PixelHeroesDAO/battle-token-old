@@ -5,6 +5,8 @@ const { string } = require("hardhat/internal/core/params/argumentTypes");
 //const artifacts = require("../artifacts/contracts/GameVault.sol/GameVault.json");
 const artifacts = require("../artifacts/contracts/PHBattleVault.sol/PHBattleVault.json");
 const artifactsPH = require("../artifacts/contracts/NFT/PixelHeroes.sol/PixelHeroes.json");
+const artifactsToken = require("../artifacts/contracts/PHGameToken.sol/PHGameToken.json");
+const artifactsEx = require("../artifacts/contracts/PHGameExchange.sol/PHGameExchange.json");
 
 const {helpers} = require("../test/helpers");
 
@@ -26,16 +28,27 @@ describe(`${_name} TEST`, function () {
   let thisChainId;
   let idPHS, idPHX;
   let ContAdmin, Cont1, Cont2, Cont3;
+  let tokenAdmin;
+  let exAdmin;
 
   it(`${_name} Contract Deploy`, async function () { 
+    let tx;
     [admin, signer, user1, user2, user3] = await ethers.getSigners();
     ContAdmin = await helpers.deployContract(_name, ["alpha1"]);
-    let tx = await ContAdmin.deployTransaction;
+    tx = await ContAdmin.deployTransaction;
     thisChainId = tx.chainId;
     console.log("        Chain ID : ", thisChainId);
     addr = ContAdmin.address;
-    console.log(`        ${_name} Deplyed by :`, tx.from);
+    console.log(`        Deplyed by :`, tx.from);
     console.log(`        ${_name} Deplyed to :`, ContAdmin.address);
+    tokenAdmin = await helpers.deployContract("PHGameToken");
+    tx = await tokenAdmin.deployTransaction;
+    console.log(`        PHGameToken Deplyed to :`, tokenAdmin.address);
+    exAdmin = await helpers.deployContract("PHGameExchange");
+    tx = await exAdmin.deployTransaction;
+    console.log(`        PHGameExchange Deplyed to :`, exAdmin.address);
+    exAdmin.setVault(ContAdmin.address);
+    exAdmin.setToken(tokenAdmin.address);
   });
 
   it(`Set signer role`, async function () {

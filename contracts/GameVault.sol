@@ -379,10 +379,10 @@ contract GameVault is AccessControl{
         return true;
     }
 
-    function _makePackedStatus(uint64 exp, uint16 lv, uint16[] memory status)
+    function _makePackedStatus(uint64 exp, uint16 lv, uint16[] memory slot)
         internal view returns(uint256)
     {
-        uint256 len = status.length;
+        uint256 len = slot.length;
         if (len > 11) revert SetOutSizedStatus();
         uint256 packedData = 
             exp | 
@@ -390,7 +390,7 @@ contract GameVault is AccessControl{
         for (uint256 i ; i < len ; i++){
             packedData = 
                 packedData | 
-                (uint256(status[i]) << (BITPOS_STATUS_FIRST + BITLENGTH_STATUS_SLOT * i));
+                (uint256(slot[i]) << (BITPOS_STATUS_FIRST + BITLENGTH_STATUS_SLOT * i));
         }
         return packedData;
     }
@@ -405,7 +405,7 @@ contract GameVault is AccessControl{
      * @param tID       Token ID
      * @param exp       Experience to be set
      * @param lv        Level to be set
-     * @param status[]  Array of status. Max length is 11.
+     * @param slot[]    Array of status. Max length is 11.
      * @param signature Signed message by signer role accouunt.
      */
     function setStatus(
@@ -413,15 +413,15 @@ contract GameVault is AccessControl{
         uint128 tID, 
         uint64 exp, 
         uint16 lv, 
-        uint16[] memory status,
+        uint16[] memory slot,
         bytes memory signature
         ) external
     {
-        _checkStatus(exp, lv, status);
+        _checkStatus(exp, lv, slot);
         _checkDisable(cID);
-        _verifySigner(_makeMessage(msg.sender, cID, tID, exp, lv, status), signature);
+        _verifySigner(_makeMessage(msg.sender, cID, tID, exp, lv, slot), signature);
         _increaseNonce(msg.sender);
-        _setStatus(cID, tID, _makePackedStatus(exp, lv, status));
+        _setStatus(cID, tID, _makePackedStatus(exp, lv, slot));
     }
 
     function _increaseNonce(address addr) internal {
@@ -439,7 +439,7 @@ contract GameVault is AccessControl{
      *      Default implementation is nothing.
      *      Overriding depends on each vault specifiation.
      */
-    function _checkStatus(uint64 exp, uint16 lv, uint16[] memory status)
+    function _checkStatus(uint64 exp, uint16 lv, uint16[] memory slot)
         internal virtual view returns(bool)
     {
         return true;
@@ -454,7 +454,7 @@ contract GameVault is AccessControl{
      * @param tID       Token ID of collection
      * @param exp       Experience
      * @param lv        Level
-     * @param status    Array of status
+     * @param slot      Array of status
      */
     function _makeMessage(
         address addr,
@@ -462,7 +462,7 @@ contract GameVault is AccessControl{
         uint256 tID,
         uint64 exp, 
         uint16 lv, 
-        uint16[] memory status
+        uint16[] memory slot
     )internal view virtual returns (string memory){
         string memory ret = string(abi.encodePacked(
             "0x",
@@ -473,10 +473,10 @@ contract GameVault is AccessControl{
             uint256(exp).toString(), "|",
             uint256(lv).toString()
         ));
-        uint256 len = status.length;
+        uint256 len = slot.length;
         for (uint256 i = 0 ; i < LENGTH_STATUS_SLOT ; i++){
             if (i < len) {
-                ret = string(abi.encodePacked(ret, "|", uint256(status[i]).toString()));
+                ret = string(abi.encodePacked(ret, "|", uint256(slot[i]).toString()));
             } else {
                 ret = string(abi.encodePacked(ret, "|", "0"));
             }
@@ -490,9 +490,9 @@ contract GameVault is AccessControl{
         uint256 tID,
         uint64 exp, 
         uint16 lv, 
-        uint16[] memory status
+        uint16[] memory slot
     )public view returns (string memory){
-        return _makeMessage(addr, cID, tID, exp, lv, status);
+        return _makeMessage(addr, cID, tID, exp, lv, slot);
     }
     /**
      * @dev verify signature function

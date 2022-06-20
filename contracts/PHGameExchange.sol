@@ -13,6 +13,13 @@ contract PHGameExchange is Ownable{
     // 経験値1あたりのトークン交換レート
     uint256 public exchangeRate;
 
+    event ExchangeToToken(
+        address indexed account, 
+        uint128 indexed cID, 
+        uint128 indexed tID, 
+        uint64 consumedExp, 
+        uint256 tokenAmount
+    );
     error ZeroAddress();
 
     constructor(){
@@ -40,9 +47,12 @@ contract PHGameExchange is Ownable{
         bytes memory signature
     ) public returns(bool) {
         uint64 exp;
+        uint256 tokenAmount = expAmount * exchangeRate;
         PHBattleVault vault = PHBattleVault(vaultAddress);
-        (exp,,) = vault.status(cID, tID);
-        console.log(exp);
+        PHGameToken token = PHGameToken(tokenAddress);
+        vault.decreaseExp(cID, tID, expAmount, signature);
+        token.mint(msg.sender, tokenAmount);
+        emit ExchangeToToken(msg.sender, cID, tID, expAmount, tokenAmount);
     }
 
 }

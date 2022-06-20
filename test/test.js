@@ -28,7 +28,7 @@ describe(`${_name} TEST`, function () {
   let thisChainId;
   let idPHS, idPHX;
   let ContAdmin, Cont1, Cont2, Cont3;
-  let tokenAdmin;
+  let tokenAdmin, token1;
   let exAdmin, ex1;
 
   it(`${_name} Contract Deploy`, async function () { 
@@ -51,12 +51,16 @@ describe(`${_name} TEST`, function () {
     addrEx = exAdmin.address;
     exAdmin.setVault(addr);
     exAdmin.setToken(addrToken);
+    expect(await exAdmin.vaultAddress()).to.be.equal(addr);
   });
 
   it(`Set signer role`, async function () {
     let tx = await ContAdmin.grantRole(await ContAdmin.SIGNER_ROLE(), signer.address);
     expect(await ContAdmin.hasRole(await ContAdmin.SIGNER_ROLE(), signer.address)).to.be.equal(true);
-    console.log("        signer address : ", signer.address);
+    console.log("        signer address of vault : ", signer.address);
+    tx = await tokenAdmin.grantRole(await tokenAdmin.MINTER_ROLE(), addrEx);
+    expect(await tokenAdmin.hasRole(await tokenAdmin.MINTER_ROLE(), addrEx)).to.be.equal(true);
+    console.log("        minter address of token: ", addrEx);
   })
 
   it("Set User Wallet", async function () { 
@@ -64,6 +68,7 @@ describe(`${_name} TEST`, function () {
     Cont2 = await new ethers.Contract(addr, artifacts.abi, user2);
     Cont3 = await new ethers.Contract(addr, artifacts.abi, user3);
     ex1 = await new ethers.Contract(addrEx, artifactsEx.abi, user1);
+    token1 = await new ethers.Contract(addrToken, artifactsToken.abi, user1);
   });
 
   it("Get totalCollection", async function () { 
@@ -313,29 +318,31 @@ describe(`${_name} TEST`, function () {
     expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() - dExp);
      
   });
-/*
-  it("", async function () {
+
+  it("Exchange Exp to Token", async function () {
     let colid = 1;
     let tid = 1;
-    let dExp = 1100;
+    let dExp = 1312;
 
     let hashbytes = helpers.MsgExpBytes
     (
-      User.ddress,
-      await Cont1.nonce(Cont1.address),
+      addrEx,
+      await Cont1.nonce(addrEx),
       colid,
       tid,
       dExp,
-      inc
+      false
     );
     let signature = await signer.signMessage(hashbytes);
 
-    await ContAdmin.decreaseExp(colid, tid, dExp, signature);
-    ret = await ContAdmin.status(colid, tid);
+    await ex1.exchangeToToken(colid, tid, dExp, signature);
+    ret = await Cont1.status(colid, tid);
     [r_exp, r_lv, r_status] = ret;
-    expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() - dExp);
+    console.log(`        Remain EXP : ${r_exp}`);
+    let r_bal = await token1.totalSupply();
+    console.log(`        Token Balance : ${(r_bal.div(BigNumber.from(10).pow(15))).toNumber()/1000} PIKU`);
      
-  });*/
+  });
   
 });
 

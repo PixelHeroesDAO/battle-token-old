@@ -14,6 +14,7 @@ import "hardhat/console.sol";
 contract GameVault is AccessControl{
 
     using Strings for uint256;
+    using Strings for uint128;
     using AddressStrings for address;
     using AddressUint for address;
     using UintAddress for uint256;
@@ -409,6 +410,7 @@ contract GameVault is AccessControl{
      * @param signature Signed message by signer role accouunt.
      */
     function setStatus(
+        uint256 uts,
         uint128 cID, 
         uint128 tID, 
         uint64 exp, 
@@ -419,7 +421,7 @@ contract GameVault is AccessControl{
     {
         _checkStatus(exp, lv, slot);
         _checkDisable(cID);
-        _verifySigner(_makeMessage(msg.sender, cID, tID, exp, lv, slot), signature);
+        _verifySigner(_makeMessage(msg.sender, uts, cID, tID, exp, lv, slot), signature);
         _increaseNonce(msg.sender);
         _setStatus(cID, tID, _makePackedStatus(exp, lv, slot));
     }
@@ -450,6 +452,7 @@ contract GameVault is AccessControl{
      *   The message contains address of user, nonce of address, cID and tID
      *   with "|" separator. All parts are string.
      * @param addr      EOA of user
+     * @param uts       Unix Timestamp
      * @param cID       Collection ID
      * @param tID       Token ID of collection
      * @param exp       Experience
@@ -458,8 +461,9 @@ contract GameVault is AccessControl{
      */
     function _makeMessage(
         address addr,
-        uint256 cID,
-        uint256 tID,
+        uint256 uts,
+        uint128 cID,
+        uint128 tID,
         uint64 exp, 
         uint16 lv, 
         uint16[] memory slot
@@ -468,6 +472,7 @@ contract GameVault is AccessControl{
             "0x",
             addr.toAsciiString(), "|", 
             nonce[addr].toString(),  "|",
+            uts.toString(), "|",
             cID.toString(), "|",
             tID.toString(), "|",
             uint256(exp).toString(), "|",
@@ -481,18 +486,21 @@ contract GameVault is AccessControl{
                 ret = string(abi.encodePacked(ret, "|", "0"));
             }
         }
+
+    console.log(ret);
         return ret;
     }
 
     function TEST_makeMessage(
         address addr,
-        uint256 cID,
-        uint256 tID,
+        uint256 uts,
+        uint128 cID,
+        uint128 tID,
         uint64 exp, 
         uint16 lv, 
         uint16[] memory slot
     )public view returns (string memory){
-        return _makeMessage(addr, cID, tID, exp, lv, slot);
+        return _makeMessage(addr, uts, cID, tID, exp, lv, slot);
     }
     /**
      * @dev verify signature function

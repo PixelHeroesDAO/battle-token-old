@@ -9,6 +9,7 @@ const artifactsToken = require("../artifacts/contracts/PHGameToken.sol/PHGameTok
 const artifactsEx = require("../artifacts/contracts/PHGameExchange.sol/PHGameExchange.json");
 
 const {helpers} = require("../test/helpers");
+const { messagePrefix } = require("@ethersproject/hash");
 
 
 const nfts = [
@@ -128,11 +129,14 @@ describe(`${_name} TEST`, function () {
     let lv = 2;
     let status = [10,23,45,35,23,66];
 
-    let ret = await Cont1.TEST_makeMessage(user1.address,colid,tid,exp,lv,status);
+    let uts = helpers.Date2UnixTimestamp(new Date());
+
+    let ret = await Cont1.TEST_makeMessage(user1.address,uts,colid,tid,exp,lv,status);
     let msg = helpers.Message
     (
       user1.address,
       await Cont1.nonce(user1.address),
+      uts, 
       colid,
       tid,
       exp,
@@ -150,10 +154,13 @@ describe(`${_name} TEST`, function () {
     let lv = 2;
     let status = [10,23,45,35,23,66];
 
+    let uts = helpers.Date2UnixTimestamp(new Date());
+
     let hashbytes = helpers.MessageBytes
     (
       user1.address,
       await Cont1.nonce(user1.address),
+      uts, 
       colid,
       tid,
       exp,
@@ -161,8 +168,20 @@ describe(`${_name} TEST`, function () {
       status
     );
     let signature = await signer.signMessage(hashbytes);
+    let message = helpers.Message
+    (
+      user1.address,
+      await Cont1.nonce(user1.address),
+      uts, 
+      colid,
+      tid,
+      exp,
+      lv,
+      status
+    );
+    console.log(message);
 
-    let tx = await Cont1.setStatus(colid, tid, exp, lv, status, signature);
+    let tx = await Cont1.setStatus(uts, colid, tid, exp, lv, status, signature);
     let r_exp, r_lv, r_status;
     let ret = await Cont1.status(colid, tid);
     [r_exp, r_lv, r_status] = ret;
@@ -229,6 +248,8 @@ describe(`${_name} TEST`, function () {
     let exp = 123242;
     let lv = 2;
     let status = [10,23,45,35,23,66];
+    
+    let uts = helpers.Date2UnixTimestamp(new Date());
 
     let ret = await ContAdmin.setDisable(colid);
 
@@ -236,6 +257,7 @@ describe(`${_name} TEST`, function () {
     (
       user1.address,
       await Cont1.nonce(user1.address),
+      uts,
       colid,
       tid,
       exp,
@@ -244,7 +266,7 @@ describe(`${_name} TEST`, function () {
     );
     let signature = await signer.signMessage(hashbytes);
 
-    await expect(ContAdmin.setStatus(colid, tid, exp, lv, status, signature)).to.be.revertedWith('CollectionIsDisable');
+    await expect(ContAdmin.setStatus(uts, colid, tid, exp, lv, status, signature)).to.be.revertedWith('CollectionIsDisable');
      
   });
   
@@ -268,6 +290,8 @@ describe(`${_name} TEST`, function () {
     let dExp = 324;
     let inc = true;
 
+    let uts = helpers.Date2UnixTimestamp(new Date());
+
     let r_exp_org, r_lv, r_status;
     let ret = await ContAdmin.status(colid, tid);
     [r_exp_org, , ] = ret;
@@ -277,6 +301,7 @@ describe(`${_name} TEST`, function () {
     (
       user1.address,
       await Cont1.nonce(user1.address),
+      uts,
       colid,
       tid,
       dExp,
@@ -284,7 +309,7 @@ describe(`${_name} TEST`, function () {
     );
     let signature = await signer.signMessage(hashbytes);
 
-    await Cont1.increaseExp(colid, tid, dExp, signature);
+    await Cont1.increaseExp(uts, colid, tid, dExp, signature);
     ret = await Cont1.status(colid, tid);
     [r_exp, r_lv, r_status] = ret;
     expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() + dExp);
@@ -296,6 +321,8 @@ describe(`${_name} TEST`, function () {
     let dExp = 4220;
     let inc = false;
 
+    let uts = helpers.Date2UnixTimestamp(new Date());
+
     let r_exp_org, r_lv, r_status;
     let ret = await ContAdmin.status(colid, tid);
     [r_exp_org, , ] = ret;
@@ -305,6 +332,7 @@ describe(`${_name} TEST`, function () {
     (
       user1.address,
       await Cont1.nonce(user1.address),
+      uts,
       colid,
       tid,
       dExp,
@@ -312,7 +340,7 @@ describe(`${_name} TEST`, function () {
     );
     let signature = await signer.signMessage(hashbytes);
 
-    await Cont1.decreaseExp(colid, tid, dExp, signature);
+    await Cont1.decreaseExp(uts, colid, tid, dExp, signature);
     ret = await Cont1.status(colid, tid);
     [r_exp, r_lv, r_status] = ret;
     expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() - dExp);
@@ -323,11 +351,14 @@ describe(`${_name} TEST`, function () {
     let colid = 1;
     let tid = 1;
     let dExp = 1312;
+    
+    let uts = helpers.Date2UnixTimestamp(new Date());
 
     let hashbytes = helpers.MsgExpBytes
     (
       addrEx,
       await Cont1.nonce(addrEx),
+      uts, 
       colid,
       tid,
       dExp,
@@ -335,7 +366,7 @@ describe(`${_name} TEST`, function () {
     );
     let signature = await signer.signMessage(hashbytes);
 
-    await ex1.exchangeToToken(colid, tid, dExp, signature);
+    await ex1.exchangeToToken(uts, colid, tid, dExp, signature);
     ret = await Cont1.status(colid, tid);
     [r_exp, r_lv, r_status] = ret;
     console.log(`        Remain EXP : ${r_exp}`);

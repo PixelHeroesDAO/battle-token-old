@@ -1,3 +1,10 @@
+//ローカルチェーンへのデプロイと初期設定用スクリプト
+//terminal 1:
+//npx hardhat node
+//terminal 2:
+//npx hardhat run scripts/run.js
+//
+
 const { BigNumber } = require("ethers");
 const { ethers } = require("hardhat");
 const { string } = require("hardhat/internal/core/params/argumentTypes");
@@ -42,10 +49,20 @@ const main = async () => {
     exAdmin.setVault(addrVault);
     exAdmin.setToken(addrToken);
 
+    //signer / minterの設定
     tx = await vaultAdmin.grantRole(await vaultAdmin.SIGNER_ROLE(), signer.address);
     console.log("        signer address of vault : ", signer.address);
     tx = await tokenAdmin.grantRole(await tokenAdmin.MINTER_ROLE(), addrEx);
     console.log("        minter address of token: ", addrEx);
+
+    //Vaultへのコレクション追加
+    for (let i = 0; i < chainid.length; i ++){
+      tx = await vaultAdmin["addCollection(uint24,address)"](chainid[i],nfts[i]);
+      await tx.wait();
+    } 
+    tx = await vaultAdmin.totalCollection();
+    console.log(`        totalCollection : ${tx}`);
+
 }
 
 const runMain = async () => {

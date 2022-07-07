@@ -16,6 +16,7 @@ import "hardhat/console.sol";
 contract PHBattleVault is GameVault{
 
     using Strings for uint256;
+    using Strings for uint128;
     using AddressStrings for address;
     using AddressUint for address;
     using UintAddress for uint256;
@@ -25,15 +26,15 @@ contract PHBattleVault is GameVault{
     constructor (string memory ver_) GameVault(ver_){
 
     }
-    function increaseExp (uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
-        _changeExp(cID, tID, dExp, true, signature);
+    function increaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
+        _changeExp(uts, cID, tID, dExp, true, signature);
     }
 
-    function decreaseExp (uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
-        _changeExp(cID, tID, dExp, false, signature);
+    function decreaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
+        _changeExp(uts, cID, tID, dExp, false, signature);
     }
 
-    function _changeExp (uint128 cID, uint128 tID, uint64 dExp, bool inc, bytes memory signature) private {
+    function _changeExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bool inc, bytes memory signature) private {
         _checkCollectionId(cID);
         uint64 exp; 
         uint16 lv;
@@ -49,7 +50,7 @@ contract PHBattleVault is GameVault{
         }
         _checkStatus(exp, lv, slot);
         _checkDisable(cID);
-        _verifySigner(_makeMsgExp(msg.sender, cID, tID, dExp, inc), signature);
+        _verifySigner(_makeMsgExp(msg.sender, uts, cID, tID, dExp, inc), signature);
         _increaseNonce(msg.sender);
         _setStatus(cID, tID, _makePackedStatus(exp, lv, slot));
 
@@ -60,6 +61,7 @@ contract PHBattleVault is GameVault{
      *   The message contains address of user, nonce of address, cID and tID
      *   with "|" separator. All parts are string.
      * @param addr      EOA of user
+     * @param cID       Unix Timestamp
      * @param cID       Collection ID
      * @param tID       Token ID of collection
      * @param dExp       Experience
@@ -67,8 +69,9 @@ contract PHBattleVault is GameVault{
      */
     function _makeMsgExp(
         address addr,
-        uint256 cID,
-        uint256 tID,
+        uint256 uts,
+        uint128 cID,
+        uint128 tID,
         uint64 dExp, 
         bool inc
     )internal view virtual returns (string memory){
@@ -82,6 +85,7 @@ contract PHBattleVault is GameVault{
             "0x",
             addr.toAsciiString(), "|", 
             nonce[addr].toString(),  "|",
+            uts.toString(), "|",
             cID.toString(), "|",
             tID.toString(), "|",
             sgn, uint256(dExp).toString()

@@ -41,6 +41,7 @@ contract PHGameExchange is Ownable{
     }
 
     function exchangeToToken(
+        uint256 uts,
         uint128 cID, 
         uint128 tID, 
         uint64 expAmount, 
@@ -50,7 +51,7 @@ contract PHGameExchange is Ownable{
         uint256 tokenAmount = expAmount * exchangeRate;
         PHBattleVault vault = PHBattleVault(vaultAddress);
         PHGameToken token = PHGameToken(tokenAddress);
-        vault.decreaseExp(cID, tID, expAmount, signature);
+        vault.decreaseExp(uts, cID, tID, expAmount, signature);
         token.mint(msg.sender, tokenAmount);
         emit ExchangeToToken(msg.sender, cID, tID, expAmount, tokenAmount);
     }

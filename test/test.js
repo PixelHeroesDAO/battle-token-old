@@ -9,7 +9,6 @@ const artifactsToken = require("../artifacts/contracts/PHGameToken.sol/PHGameTok
 const artifactsEx = require("../artifacts/contracts/PHGameExchange.sol/PHGameExchange.json");
 
 const {helpers} = require("../test/helpers");
-const { messagePrefix } = require("@ethersproject/hash");
 
 
 const nfts = [
@@ -131,7 +130,7 @@ describe(`${_name} TEST`, function () {
 
     let uts = helpers.Date2UnixTimestamp(new Date());
 
-    let ret = await Cont1.TEST_makeMessage(user1.address,uts,colid,tid,exp,lv,status);
+    let ret = await Cont1.TEST_makeMessage(user1.address,uts, colid,tid,exp,lv,status);
     let msg = helpers.Message
     (
       user1.address,
@@ -168,18 +167,6 @@ describe(`${_name} TEST`, function () {
       status
     );
     let signature = await signer.signMessage(hashbytes);
-    let message = helpers.Message
-    (
-      user1.address,
-      await Cont1.nonce(user1.address),
-      uts, 
-      colid,
-      tid,
-      exp,
-      lv,
-      status
-    );
-    console.log(message);
 
     let tx = await Cont1.setStatus(uts, colid, tid, exp, lv, status, signature);
     let r_exp, r_lv, r_status;
@@ -340,7 +327,7 @@ describe(`${_name} TEST`, function () {
     );
     let signature = await signer.signMessage(hashbytes);
 
-    await Cont1.decreaseExp(uts, colid, tid, dExp, signature);
+    await Cont1.decreaseExp(uts,colid, tid, dExp, signature);
     ret = await Cont1.status(colid, tid);
     [r_exp, r_lv, r_status] = ret;
     expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() - dExp);
@@ -374,7 +361,6 @@ describe(`${_name} TEST`, function () {
     console.log(`        Token Balance : ${(r_bal.div(BigNumber.from(10).pow(15))).toNumber()/1000} PIKU`);
      
   });
-  
 });
 
 

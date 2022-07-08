@@ -20,6 +20,9 @@ contract PHBattleVault is GameVault{
     using AddressStrings for address;
     using AddressUint for address;
     using UintAddress for uint256;
+
+    event ChangeExp(uint128 indexed collectionId, uint128 indexed tokenId, uint64 dExp, bool inc);
+
     error ExperienceOverFlow();
     error ExperienceUnderFlow();
 
@@ -51,8 +54,11 @@ contract PHBattleVault is GameVault{
         _checkStatus(exp, lv, slot);
         _checkDisable(cID);
         _verifySigner(_makeMsgExp(msg.sender, uts, cID, tID, dExp, inc), signature);
+        _verifyTimestamp(uts);
         _increaseNonce(msg.sender);
-        _setStatus(cID, tID, _makePackedStatus(exp, lv, slot));
+        _setStatus(cID, tID, exp, lv, slot, false);
+        
+        emit ChangeExp(cID, tID, dExp, inc);
 
     }
 

@@ -103,9 +103,13 @@ contract GameVault is AccessControl{
     
     // 登録済みコレクション数
     uint128 private _totalCollection;
+
+    // 署名の有効期限
+    uint256 private _expireDuration;
+
     // イベント
     event AddCollection(uint128 indexed collectionId, uint24 chainId, address addr);
-    event SetStatus(uint128 indexed collectionId, uint128 indexed tokenId, uint256 packedStatus);
+    event SetStatus(uint128 indexed collectionId, uint128 indexed tokenId, uint64 exp, uint16 lv, uint16[] slot);
 
     //エラー関数
     // 存在しないコレクションへの参照
@@ -120,10 +124,13 @@ contract GameVault is AccessControl{
     error FailInitializingCollectionDisable();
     // コレクションが無効化されている
     error CollectionIsDisable();
+    // 署名が失効した
+    error SignatureExpired();
 
 
     constructor (string memory ver_) {
         version = ver_;
+        _expireDuration = 10 minutes;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);
@@ -369,14 +376,21 @@ contract GameVault is AccessControl{
      * if user should pay gas fee.
      * @param cID           collection ID
      * @param tID           token ID of collection
-     * @param packedData    Packed status data
      *   if length is under 11, lack slot(s) is filled with 0.
      */
-    function _setStatus(uint128 cID, uint128 tID, uint256 packedData)
+    function _setStatus(
+        uint128 cID,
+        uint128 tID,
+        uint64 exp, 
+        uint16 lv, 
+        uint16[] memory slot,
+        bool emitEvent
+)
         internal returns(bool)
     {
+        uint256 packedData = _makePackedStatus(exp, lv, slot);
         _packedStatusVault[_makePackedId(cID, tID)] = packedData;
-        emit SetStatus(cID, tID, packedData);
+        if (emitEvent) emit SetStatus(cID, tID, exp, lv, slot);
         return true;
     }
 
@@ -422,10 +436,17 @@ contract GameVault is AccessControl{
         _checkStatus(exp, lv, slot);
         _checkDisable(cID);
         _verifySigner(_makeMessage(msg.sender, uts, cID, tID, exp, lv, slot), signature);
+        _verifyTimestamp(uts);
         _increaseNonce(msg.sender);
-        _setStatus(cID, tID, _makePackedStatus(exp, lv, slot));
+        _setStatus(cID, tID, exp, lv, slot, true);
     }
 
+    function expireDuration() public view returns(uint256){
+        return _expireDuration;
+    }
+    function setExpireDuration(uint256 newDuration) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _expireDuration = newDuration;
+    }
     function _increaseNonce(address addr) internal {
         nonce[addr]++;
     }
@@ -486,8 +507,6 @@ contract GameVault is AccessControl{
                 ret = string(abi.encodePacked(ret, "|", "0"));
             }
         }
-
-    console.log(ret);
         return ret;
     }
 
@@ -511,6 +530,12 @@ contract GameVault is AccessControl{
         //署名検証
         if(!hasRole(SIGNER_ROLE, RecoverSigner.recoverSignerByMsg(message, signature))) 
             revert OperateWithInvalidSignature();
+        return true;
+    }
+
+    function _verifyTimestamp(uint256 uts) internal view returns(bool){
+        if (uts + _expireDuration < block.timestamp) revert SignatureExpired();
+        console.log("chain stamp", block.timestamp, "test stamp", uts );
         return true;
     }
 

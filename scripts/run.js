@@ -46,6 +46,12 @@ const main = async () => {
     console.log("        signer address of vault : ", signer.address);
     tx = await tokenAdmin.grantRole(await tokenAdmin.MINTER_ROLE(), addrEx);
     console.log("        minter address of token: ", addrEx);
+
+    for (let i = 0; i < chainid.length; i ++){
+      tx = await vaultAdmin["addCollection(uint24,address)"](chainid[i],nfts[i]);
+      await tx.wait();
+    } 
+
 }
 
 const runMain = async () => {

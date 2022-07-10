@@ -21,7 +21,7 @@ contract PHBattleVault is GameVault{
     using AddressUint for address;
     using UintAddress for uint256;
 
-    event ChangeExp(uint128 indexed collectionId, uint128 indexed tokenId, uint64 dExp, bool inc);
+    event MintExp(uint128 indexed collectionId, uint128 indexed tokenId, uint64 dExp);
 
     error ExperienceOverFlow();
     error ExperienceUnderFlow();
@@ -29,15 +29,32 @@ contract PHBattleVault is GameVault{
     constructor (string memory ver_) GameVault(ver_){
 
     }
+
+    // Expのミントを実行。主にオフチェーンからのトークン移行時に使用し、専用のイベントを発行する。
+    function mintExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
+        _changeExp(uts, cID, tID, dExp, true, signature, false);
+        emit MintExp(cID, tID, dExp);
+    }
+
+    // Expを増加させる。主に内部での処理を想定し、SetStatusイベントが発行される。
     function increaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
-        _changeExp(uts, cID, tID, dExp, true, signature);
+        _changeExp(uts, cID, tID, dExp, true, signature, true);
     }
 
+    // Expを減少させる。主に内部での処理を想定し、SetStatusイベントが発行される。
     function decreaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
-        _changeExp(uts, cID, tID, dExp, false, signature);
+        _changeExp(uts, cID, tID, dExp, false, signature, true);
     }
 
-    function _changeExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bool inc, bytes memory signature) private {
+    function _changeExp (
+        uint256 uts, 
+        uint128 cID, 
+        uint128 tID, 
+        uint64 dExp, 
+        bool inc, 
+        bytes memory signature,
+        bool emitEvent
+    ) private {
         _checkCollectionId(cID);
         uint64 exp; 
         uint16 lv;
@@ -56,9 +73,7 @@ contract PHBattleVault is GameVault{
         _verifySigner(_makeMsgExp(msg.sender, uts, cID, tID, dExp, inc), signature);
         _verifyTimestamp(uts);
         _increaseNonce(msg.sender);
-        _setStatus(cID, tID, exp, lv, slot, false);
-        
-        emit ChangeExp(cID, tID, dExp, inc);
+        _setStatus(cID, tID, exp, lv, slot, emitEvent);
 
     }
 

@@ -130,7 +130,7 @@ contract GameVault is AccessControl{
 
     constructor (string memory ver_) {
         version = ver_;
-        _expireDuration = 10 minutes;
+        _expireDuration = 60 minutes;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);

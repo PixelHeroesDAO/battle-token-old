@@ -1,7 +1,8 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./PHBattleVault.sol";
+//import "./PHBattleVault.sol";
+import "./interfaces/IPHBattleVault.sol";
 import "./PHGameToken.sol";
 
 import "hardhat/console.sol";
@@ -48,13 +49,13 @@ contract PHGameExchange is Ownable{
         uint64 expAmount, 
         bytes memory signature
     ) public returns(bool) {
-        uint64 exp;
         uint256 tokenAmount = expAmount * exchangeRate;
-        PHBattleVault vault = PHBattleVault(vaultAddress);
-        PHGameToken token = PHGameToken(tokenAddress);
+        IPHBattleVault vault = IPHBattleVault(vaultAddress);
+        IPHGameToken token = IPHGameToken(tokenAddress);
         vault.decreaseExp(uts, cID, tID, expAmount, signature);
         token.mint(msg.sender, tokenAmount);
         emit ExchangeToToken(msg.sender, cID, tID, expAmount, tokenAmount);
+        return true;
     }
 
 }

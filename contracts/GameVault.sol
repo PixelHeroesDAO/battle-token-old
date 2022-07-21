@@ -346,6 +346,7 @@ contract GameVault is IGameVault, AccessControl{
      */
     function _checkDisable(uint128 cID) internal view returns(bool){
         if (collectionDisable(cID)) revert CollectionIsDisable();
+        return true;
     }
     function status(uint128 cID, uint128 tID) public override view returns(
         uint64 exp,
@@ -399,7 +400,7 @@ contract GameVault is IGameVault, AccessControl{
     }
 
     function _makePackedStatus(uint64 exp, uint16 lv, uint16[] memory slot)
-        internal view returns(uint256)
+        internal pure returns(uint256)
     {
         uint256 len = slot.length;
         if (len > 11) revert SetOutSizedStatus();
@@ -414,7 +415,7 @@ contract GameVault is IGameVault, AccessControl{
         return packedData;
     }
 
-    function _makePackedId(uint128 cID, uint128 tID) internal view returns(uint256){
+    function _makePackedId(uint128 cID, uint128 tID) internal pure returns(uint256){
         return cID | (uint256(tID) << BITPOS_TOKEN_ID);
     }
 

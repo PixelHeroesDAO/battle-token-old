@@ -331,7 +331,8 @@ describe(`${_name} TEST`, function () {
     ret = await Cont1.status(colid, tid);
     [r_exp, r_lv, r_status] = ret;
     expect(r_exp.toNumber()).to.be.equal(r_exp_org.toNumber() - dExp);
-     
+    console.log(`        Remain EXP : ${r_exp}`);
+
   });
 
   it("Exchange Exp to Token", async function () {

@@ -30,7 +30,7 @@ interface IGameVault{
         bool isSerial_, 
         uint256 startId_, 
         uint256 maxSupply_)
-    external virtual returns(bool);
+    external returns(bool);
 
     function setCollectionDisable(uint128 cID) external ;
 

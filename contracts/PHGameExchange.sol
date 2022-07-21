@@ -1,9 +1,8 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-//import "./PHBattleVault.sol";
 import "./interfaces/IPHBattleVault.sol";
-import "./PHGameToken.sol";
+import "./interfaces/IPHGameToken.sol";
 
 import "hardhat/console.sol";
 

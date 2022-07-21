@@ -4,6 +4,8 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
+import "./interfaces/IGameVault.sol";
+
 import "./lib/RecoverSigner.sol";
 import "./lib/AddressStrings.sol";
 import "./lib/AddressUint.sol";
@@ -11,7 +13,7 @@ import "./lib/AddressUint.sol";
 import "hardhat/console.sol";
 
 
-contract GameVault is AccessControl{
+contract GameVault is IGameVault, AccessControl{
 
     using Strings for uint256;
     using Strings for uint128;
@@ -107,10 +109,6 @@ contract GameVault is AccessControl{
     // 署名の有効期限
     uint256 private _expireDuration;
 
-    // イベント
-    event AddCollection(uint128 indexed collectionId, uint24 chainId, address addr);
-    event SetStatus(uint128 indexed collectionId, uint128 indexed tokenId, uint64 exp, uint16 lv, uint16[] slot);
-
     //エラー関数
     // 存在しないコレクションへの参照
     error ReferNonexistentCollection();
@@ -151,7 +149,7 @@ contract GameVault is AccessControl{
         bool isSerial_,
         uint24 startId_,
         uint24 maxSupply_
-    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
+    ) public override onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
         return _addCollection(
             chainId_, 
             addr_, 
@@ -170,7 +168,7 @@ contract GameVault is AccessControl{
     function addCollection(
         uint24 chainId_, 
         address addr_
-    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
+    ) public override onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
         return _addCollection(chainId_, addr_, false, uint24(0), uint24(0));
     }
 
@@ -207,7 +205,7 @@ contract GameVault is AccessControl{
      * @dev Return total number of registered NFT collection.
      * The internal collection ID is valid in uint128.
      */
-    function totalCollection() public view returns (uint256){
+    function totalCollection() public view override returns (uint256){
         return uint256(_totalCollection);
     }
 
@@ -215,7 +213,7 @@ contract GameVault is AccessControl{
      * @dev Return total number of registered NFT collection.
      * The internal collection ID is valid in uint128.
      */
-    function collection(uint128 cID) public view returns (
+    function collection(uint128 cID) public view override returns (
         uint256 chainId_, 
         address addr_, 
         bool isSerial_, 
@@ -240,7 +238,7 @@ contract GameVault is AccessControl{
         bool isSerial_, 
         uint256 startId_, 
         uint256 maxSupply_)
-    public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns(bool) {
+    public override onlyRole(DEFAULT_ADMIN_ROLE) returns(bool) {
         _checkCollectionId(cID);
         return _changeCollectionSupply(cID, isSerial_, startId_, maxSupply_);
     }
@@ -283,10 +281,10 @@ contract GameVault is AccessControl{
     }
 
     /**
-     * @dev 指定のコレクションIDを無効にする
+     * dev 指定のコレクションIDを無効にする
      *
      */
-    function _setDisable(uint128 cID) internal virtual {
+/*    function _setDisable(uint128 cID) internal virtual {
         uint128 id = _totalCollection;
         if (id > cID) id = cID;
         // コレクションIDは1スタートだが配列は0スタートなのでずらす
@@ -295,13 +293,13 @@ contract GameVault is AccessControl{
         uint256 op = ~ (1 << (id % 256));
         uint256 data = _collectionDisable[index];
         _collectionDisable[index] = ~ ((~ data) & op);
-    }
+    }*/
 
     /**
-     * @dev 指定のコレクションIDを有効にする
+     * @dev 指定のコレクションIDを有効または無効にする
      *
      */
-    function _setEnable(uint128 cID) internal virtual {
+    function _setDisable(uint128 cID, bool disable) internal virtual {
         uint128 id = _totalCollection;
         if (id > cID) id = cID;
         // コレクションIDは1スタートだが配列は0スタートなのでずらす
@@ -309,22 +307,28 @@ contract GameVault is AccessControl{
         uint256 index = id / 256;
         uint256 op = ~ (1 << (id % 256));
         uint256 data = _collectionDisable[index];
-        _collectionDisable[index] = data & op;
+        if (disable){
+             _collectionDisable[index] = ~ ((~ data) & op);
+       }else{
+            _collectionDisable[index] = data & op;
+        }
     }
 
-    function setDisable(uint128 cID) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _setDisable(cID);
+    function setCollectionDisable(uint128 cID) public override onlyRole(DEFAULT_ADMIN_ROLE) {
+        _checkCollectionId(cID);
+        _setDisable(cID, true);
     }
 
-    function setEnable(uint128 cID) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _setEnable(cID);
+    function setCollectionEnable(uint128 cID) public override onlyRole(DEFAULT_ADMIN_ROLE) {
+        _checkCollectionId(cID);
+        _setDisable(cID, false);
     }
 
     /**
-     * @dev 指定のコレクションIDを有効にする
+     * @dev 指定のコレクションIDが無効かを取得する
      *
      */
-    function collectionDisable(uint128 cID) public view returns(bool) {
+    function collectionDisable(uint128 cID) public override view returns(bool) {
         _checkCollectionId(cID);
         // コレクションIDは1スタートだが配列は0スタートなのでずらす
         uint128 id = cID - 1;
@@ -343,7 +347,7 @@ contract GameVault is AccessControl{
     function _checkDisable(uint128 cID) internal view returns(bool){
         if (collectionDisable(cID)) revert CollectionIsDisable();
     }
-    function status(uint128 cID, uint128 tID) public virtual view returns(
+    function status(uint128 cID, uint128 tID) public override view returns(
         uint64 exp,
         uint16 lv,
         uint16[] memory slot
@@ -422,7 +426,7 @@ contract GameVault is AccessControl{
      * @param lv        Level to be set
      * @param slot[]    Array of status. Max length is 11.
      * @param signature Signed message by signer role accouunt.
-     */
+     */ 
     function setStatus(
         uint256 uts,
         uint128 cID, 
@@ -431,7 +435,7 @@ contract GameVault is AccessControl{
         uint16 lv, 
         uint16[] memory slot,
         bytes memory signature
-        ) external
+        ) public override
     {
         _checkStatus(exp, lv, slot);
         _checkDisable(cID);
@@ -441,10 +445,10 @@ contract GameVault is AccessControl{
         _setStatus(cID, tID, exp, lv, slot, true);
     }
 
-    function expireDuration() public view returns(uint256){
+    function expireDuration() public override view returns(uint256){
         return _expireDuration;
     }
-    function setExpireDuration(uint256 newDuration) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setExpireDuration(uint256 newDuration) public override onlyRole(DEFAULT_ADMIN_ROLE) {
         _expireDuration = newDuration;
     }
     function _increaseNonce(address addr) internal {

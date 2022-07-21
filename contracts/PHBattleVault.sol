@@ -1,6 +1,7 @@
 pragma solidity ^0.8.4;
 
 import "./GameVault.sol";
+import "./interfaces/IPHBattleVault.sol";
 
 //import "@openzeppelin/contracts/access/AccessControl.sol";
 //import "@openzeppelin/contracts/utils/Strings.sol";
@@ -13,15 +14,13 @@ import "./GameVault.sol";
 import "hardhat/console.sol";
 
 
-contract PHBattleVault is GameVault{
+contract PHBattleVault is GameVault, IPHBattleVault{
 
     using Strings for uint256;
     using Strings for uint128;
     using AddressStrings for address;
     using AddressUint for address;
     using UintAddress for uint256;
-
-    event MintExp(uint128 indexed collectionId, uint128 indexed tokenId, uint64 dExp);
 
     error ExperienceOverFlow();
     error ExperienceUnderFlow();
@@ -31,18 +30,18 @@ contract PHBattleVault is GameVault{
     }
 
     // Expのミントを実行。主にオフチェーンからのトークン移行時に使用し、専用のイベントを発行する。
-    function mintExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
+    function mintExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external override {
         _changeExp(uts, cID, tID, dExp, true, signature, false);
         emit MintExp(cID, tID, dExp);
     }
 
     // Expを増加させる。主に内部での処理を想定し、SetStatusイベントが発行される。
-    function increaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
+    function increaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external override{
         _changeExp(uts, cID, tID, dExp, true, signature, true);
     }
 
     // Expを減少させる。主に内部での処理を想定し、SetStatusイベントが発行される。
-    function decreaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external {
+    function decreaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external override{
         _changeExp(uts, cID, tID, dExp, false, signature, true);
     }
 

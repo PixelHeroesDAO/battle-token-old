@@ -196,7 +196,7 @@ describe(`${_name} TEST`, function () {
     let ret;
     let colid = 3;
     const resExpect = [false, false, true];
-    ret = await ContAdmin.setDisable(colid);
+    ret = await ContAdmin.setCollectionDisable(colid);
     for (let i = 1 ; i <= 3 ; i++){
       ret = await Cont1.collectionDisable(i);
       console.log(`        Collection Disable of ID=${i}:${ret}`);
@@ -208,7 +208,7 @@ describe(`${_name} TEST`, function () {
     let ret;
     let colid = 3;
     const resExpect = [false, false, false];
-    ret = await ContAdmin.setEnable(colid);
+    ret = await ContAdmin.setCollectionEnable(colid);
     for (let i = 1 ; i <= 3 ; i++){
       ret = await Cont1.collectionDisable(i);
       console.log(`        Collection Disable of ID=${i}:${ret}`);
@@ -220,7 +220,7 @@ describe(`${_name} TEST`, function () {
     let ret;
     const resExpect = [false, true, true, true, true, false];
     for (let i = 254 ; i <= 257 ; i++){
-      ret = await ContAdmin.setDisable(i);
+      ret = await ContAdmin.setCollectionDisable(i);
     }
     for (let i = 253 ; i <= 258 ; i++){
       ret = await Cont1.collectionDisable(i);
@@ -238,7 +238,7 @@ describe(`${_name} TEST`, function () {
     
     let uts = helpers.Date2UnixTimestamp(new Date());
 
-    let ret = await ContAdmin.setDisable(colid);
+    let ret = await ContAdmin.setCollectionDisable(colid);
 
     let hashbytes = helpers.MessageBytes
     (

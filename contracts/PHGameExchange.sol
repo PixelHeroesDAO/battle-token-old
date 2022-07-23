@@ -7,8 +7,8 @@ import "./interfaces/IPHGameToken.sol";
 import "hardhat/console.sol";
 
 contract PHGameExchange is Ownable{
-    address public vaultAddress;
-    address public tokenAddress;
+    IPHBattleVault public vault;
+    IPHGameToken public token;
 
     // 経験値1あたりのトークン交換レート
     uint256 public exchangeRate;
@@ -27,14 +27,14 @@ contract PHGameExchange is Ownable{
         exchangeRate = 1 ether / 1000;
     }
 
-    function setVault(address addr) public onlyOwner {
-        if (addr == address(0)) revert ZeroAddress();
-        vaultAddress = addr;
+    function setVault(IPHBattleVault vault_) public onlyOwner {
+        if (address(vault_) == address(0)) revert ZeroAddress();
+        vault = vault_;
     }
 
-    function setToken(address addr) public onlyOwner {
-        if (addr == address(0)) revert ZeroAddress();
-        tokenAddress = addr;
+    function setToken(IPHGameToken token_) public onlyOwner {
+        if (address(token_) == address(0)) revert ZeroAddress();
+        token = token_;
     }
 
     function setExchangeRate(uint256 rate) public onlyOwner {
@@ -49,8 +49,6 @@ contract PHGameExchange is Ownable{
         bytes memory signature
     ) public returns(bool) {
         uint256 tokenAmount = expAmount * exchangeRate;
-        IPHBattleVault vault = IPHBattleVault(vaultAddress);
-        IPHGameToken token = IPHGameToken(tokenAddress);
         vault.decreaseExp(uts, cID, tID, expAmount, signature);
         token.mint(msg.sender, tokenAmount);
         emit ExchangeToToken(msg.sender, cID, tID, expAmount, tokenAmount);

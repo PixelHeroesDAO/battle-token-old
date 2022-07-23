@@ -52,7 +52,7 @@ contract PHBattleVault is GameVault, IPHBattleVault{
         uint64 dExp, 
         bool inc, 
         bytes memory signature,
-        bool emitEvent
+        bool emitSetStatusEvent
     ) private {
         _checkCollectionId(cID);
         uint64 exp; 

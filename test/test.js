@@ -51,7 +51,7 @@ describe(`${_name} TEST`, function () {
     addrEx = exAdmin.address;
     exAdmin.setVault(addr);
     exAdmin.setToken(addrToken);
-    expect(await exAdmin.vaultAddress()).to.be.equal(addr);
+    expect(await exAdmin.vault()).to.be.equal(addr);
   });
 
   it(`Set signer role`, async function () {

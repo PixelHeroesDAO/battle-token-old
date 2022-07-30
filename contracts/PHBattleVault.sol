@@ -55,24 +55,20 @@ contract PHBattleVault is GameVault, IPHBattleVault{
         bool emitSetStatusEvent
     ) private {
         _checkCollectionId(cID);
-        uint64 exp; 
-        uint16 lv;
-        //戻り値動的配列に合わせる
-        uint16[] memory slot;
-        (exp, lv, slot) = _status(cID, tID);
+        Status memory data = _status(cID, tID);
         if (inc) {
-            if (exp + dExp > type(uint64).max) revert ExperienceOverFlow();   
-            exp = exp + dExp;
+            if (data.exp + dExp > type(uint64).max) revert ExperienceOverFlow();   
+            data.exp = data.exp + dExp;
         } else {
-            if (exp < dExp) revert ExperienceUnderFlow();
-            exp = exp - dExp;
+            if (data.exp < dExp) revert ExperienceUnderFlow();
+            data.exp = data.exp - dExp;
         }
-        _checkStatus(exp, lv, slot);
+        _checkStatus(data);
         _checkDisable(cID);
         _verifySigner(_makeMsgExp(msg.sender, uts, cID, tID, dExp, inc), signature);
         _verifyTimestamp(uts);
         _increaseNonce(msg.sender);
-        _setStatus(cID, tID, exp, lv, slot, emitEvent);
+        _setStatus(cID, tID, data, emitSetStatusEvent);
 
     }
 

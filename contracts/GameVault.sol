@@ -137,26 +137,10 @@ contract GameVault is IGameVault, AccessControl{
     /**
      * @dev NFT collectionを登録する。
      * The internal collection ID is valid in uint128.
-     * @param chainId_  NFTコントラクトのチェーンID(内部uint24)
-     * @param addr_     NFTコントラクトアドレス
-     * @param isSerial_ needs true if the collection is issued serialy. uint8 internally.
-     * @param startId_ is only used when isSerial is true. Otherwise assign 0. uint24 internally.
-     * @param maxSupply_ is only used when isSerial is true. Otherwise assign 0. uint24 internally.
+     * @param data      Collection構造体データ
      */
-    function addCollection(
-        uint24 chainId_, 
-        address addr_, 
-        bool isSerial_,
-        uint24 startId_,
-        uint24 maxSupply_
-    ) public override onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
-        return _addCollection(
-            chainId_, 
-            addr_, 
-            isSerial_, 
-            startId_, 
-            maxSupply_
-        );
+    function addCollection(Collection memory data) public override onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
+        return _addCollection(data.chainId, data.addr, data.isSerial, data.startId, data.maxSupply);
     }
 
     /**
@@ -201,6 +185,7 @@ contract GameVault is IGameVault, AccessControl{
         return newId;
     }
 
+
     /**
      * @dev Return total number of registered NFT collection.
      * The internal collection ID is valid in uint128.
@@ -213,31 +198,25 @@ contract GameVault is IGameVault, AccessControl{
      * @dev Return total number of registered NFT collection.
      * The internal collection ID is valid in uint128.
      */
-    function collection(uint128 cID) public view override returns (
-        uint256 chainId_, 
-        address addr_, 
-        bool isSerial_, 
-        uint24 startId_, 
-        uint24 maxSupply_
-    ){
+    function collection(uint128 cID) public view override returns (Collection memory ret){
         _checkCollectionId(cID);
         uint256 packedUint = _packedCollection[cID];
-        chainId_ = packedUint & BITMASK_COLLECTION_SLOT;
-        addr_ = ((packedUint >> BITPOS_ADDRESS) & BITMASK_ADDRESS).toAddress();
+        ret.chainId = uint24(packedUint & BITMASK_COLLECTION_SLOT);
+        ret.addr = ((packedUint >> BITPOS_ADDRESS) & BITMASK_ADDRESS).toAddress();
         if((packedUint >> BITPOS_IS_SERIAL) & BITMASK_IS_SERIAL == 0){
-            isSerial_ = false;
+            ret.isSerial = false;
         } else {
-            isSerial_ = true;
+            ret.isSerial = true;
         }
-        startId_ = uint24((packedUint >> BITPOS_START_ID) & BITMASK_COLLECTION_SLOT);
-        maxSupply_ = uint24((packedUint >> BITPOS_MAX_SUPPLY) & BITMASK_COLLECTION_SLOT);
+        ret.startId = uint24((packedUint >> BITPOS_START_ID) & BITMASK_COLLECTION_SLOT);
+        ret.maxSupply = uint24((packedUint >> BITPOS_MAX_SUPPLY) & BITMASK_COLLECTION_SLOT);
     }
 
     function changeCollectionSupply(
         uint128 cID, 
         bool isSerial_, 
-        uint256 startId_, 
-        uint256 maxSupply_)
+        uint24 startId_, 
+        uint24 maxSupply_)
     public override onlyRole(DEFAULT_ADMIN_ROLE) returns(bool) {
         _checkCollectionId(cID);
         return _changeCollectionSupply(cID, isSerial_, startId_, maxSupply_);
@@ -246,8 +225,8 @@ contract GameVault is IGameVault, AccessControl{
     function _changeCollectionSupply(
         uint128 cID_, 
         bool isSerial_, 
-        uint256 startId_, 
-        uint256 maxSupply_)
+        uint24 startId_, 
+        uint24 maxSupply_)
     internal virtual returns(bool) {
         //isSerialの前のパックデータを抽出する
         uint256 packedData = _packedCollection[cID_] & ((1 << BITPOS_IS_SERIAL)-1);
@@ -348,27 +327,18 @@ contract GameVault is IGameVault, AccessControl{
         if (collectionDisable(cID)) revert CollectionIsDisable();
         return true;
     }
-    function status(uint128 cID, uint128 tID) public override view returns(
-        uint64 exp,
-        uint16 lv,
-        uint16[] memory slot
-    ){
+    function status(uint128 cID, uint128 tID) public override view returns(Status memory){
         _checkCollectionId(cID);
         return _status(cID, tID);
     }
 
-    function _status(uint128 cID, uint128 tID) internal view returns(
-        uint64 exp,
-        uint16 lv,
-        uint16[] memory slot
-    ){
-        //戻り値に動的配列形式を使うため、配列サイズを予め定義する（memoryは可変できない）
-        slot = new uint16[](LENGTH_STATUS_SLOT);
+    function _status(uint128 cID, uint128 tID) internal view returns(Status memory ret){
         uint256 packedData = _packedStatusVault[_makePackedId(cID, tID)];
-        exp = uint64(packedData & BITMASK_EXPERIENCE);
-        lv = uint16((packedData >> BITPOS_LEVEL) & BITMASK_LEVEL);
+        ret.exp = uint64(packedData & BITMASK_EXPERIENCE);
+        ret.lv = uint16((packedData >> BITPOS_LEVEL) & BITMASK_LEVEL);
+        ret.slot = new uint16[](11);
         for (uint i = 0 ; i < LENGTH_STATUS_SLOT ; i++){
-            slot[i] =uint16( 
+            ret.slot[i] =uint16( 
                 (packedData >> (BITPOS_STATUS_FIRST + i * BITLENGTH_STATUS_SLOT))
                 & BITMASK_STATUS_SLOT
             );
@@ -386,31 +356,29 @@ contract GameVault is IGameVault, AccessControl{
     function _setStatus(
         uint128 cID,
         uint128 tID,
-        uint64 exp, 
-        uint16 lv, 
-        uint16[] memory slot,
+        Status memory data,
         bool emitEvent
 )
         internal returns(bool)
     {
-        uint256 packedData = _makePackedStatus(exp, lv, slot);
+        uint256 packedData = _makePackedStatus(data);
         _packedStatusVault[_makePackedId(cID, tID)] = packedData;
-        if (emitEvent) emit SetStatus(cID, tID, exp, lv, slot);
+        if (emitEvent) emit SetStatus(cID, tID, data.exp, data.lv, data.slot);
         return true;
     }
 
-    function _makePackedStatus(uint64 exp, uint16 lv, uint16[] memory slot)
+    function _makePackedStatus(Status memory data)
         internal pure returns(uint256)
     {
-        uint256 len = slot.length;
-        if (len > 11) revert SetOutSizedStatus();
+        uint256 len = data.slot.length;
+        if (len > LENGTH_STATUS_SLOT) revert SetOutSizedStatus();
         uint256 packedData = 
-            exp | 
-            (uint256(lv) << BITPOS_LEVEL);
+            data.exp | 
+            (uint256(data.lv) << BITPOS_LEVEL);
         for (uint256 i ; i < len ; i++){
             packedData = 
                 packedData | 
-                (uint256(slot[i]) << (BITPOS_STATUS_FIRST + BITLENGTH_STATUS_SLOT * i));
+                (uint256(data.slot[i]) << (BITPOS_STATUS_FIRST + BITLENGTH_STATUS_SLOT * i));
         }
         return packedData;
     }
@@ -423,27 +391,23 @@ contract GameVault is IGameVault, AccessControl{
      * @dev Public setting status function with signature by signer role.
      * @param cID       Collection ID
      * @param tID       Token ID
-     * @param exp       Experience to be set
-     * @param lv        Level to be set
-     * @param slot[]    Array of status. Max length is 11.
+     * @param data      Struct of status.
      * @param signature Signed message by signer role accouunt.
      */ 
     function setStatus(
         uint256 uts,
         uint128 cID, 
         uint128 tID, 
-        uint64 exp, 
-        uint16 lv, 
-        uint16[] memory slot,
+        Status memory data,
         bytes memory signature
         ) public override
     {
-        _checkStatus(exp, lv, slot);
+        _checkStatus(data);
         _checkDisable(cID);
-        _verifySigner(_makeMessage(msg.sender, uts, cID, tID, exp, lv, slot), signature);
+        _verifySigner(_makeMessage(msg.sender, uts, cID, tID, data), signature);
         _verifyTimestamp(uts);
         _increaseNonce(msg.sender);
-        _setStatus(cID, tID, exp, lv, slot, true);
+        _setStatus(cID, tID, data, true);
     }
 
     function expireDuration() public override view returns(uint256){
@@ -467,7 +431,7 @@ contract GameVault is IGameVault, AccessControl{
      *      Default implementation is nothing.
      *      Overriding depends on each vault specifiation.
      */
-    function _checkStatus(uint64 exp, uint16 lv, uint16[] memory slot)
+    function _checkStatus(Status memory data)
         internal virtual view returns(bool)
     {
         return true;
@@ -481,18 +445,14 @@ contract GameVault is IGameVault, AccessControl{
      * @param uts       Unix Timestamp
      * @param cID       Collection ID
      * @param tID       Token ID of collection
-     * @param exp       Experience
-     * @param lv        Level
-     * @param slot      Array of status
+     * @param data      Struct of status
      */
     function _makeMessage(
         address addr,
         uint256 uts,
         uint128 cID,
         uint128 tID,
-        uint64 exp, 
-        uint16 lv, 
-        uint16[] memory slot
+        Status memory data
     )internal view virtual returns (string memory){
         string memory ret = string(abi.encodePacked(
             "0x",
@@ -501,13 +461,13 @@ contract GameVault is IGameVault, AccessControl{
             uts.toString(), "|",
             cID.toString(), "|",
             tID.toString(), "|",
-            uint256(exp).toString(), "|",
-            uint256(lv).toString()
+            uint256(data.exp).toString(), "|",
+            uint256(data.lv).toString()
         ));
-        uint256 len = slot.length;
+        uint256 len = data.slot.length;
         for (uint256 i = 0 ; i < LENGTH_STATUS_SLOT ; i++){
             if (i < len) {
-                ret = string(abi.encodePacked(ret, "|", uint256(slot[i]).toString()));
+                ret = string(abi.encodePacked(ret, "|", uint256(data.slot[i]).toString()));
             } else {
                 ret = string(abi.encodePacked(ret, "|", "0"));
             }
@@ -520,11 +480,9 @@ contract GameVault is IGameVault, AccessControl{
         uint256 uts,
         uint128 cID,
         uint128 tID,
-        uint64 exp, 
-        uint16 lv, 
-        uint16[] memory slot
+        Status memory data
     )public view returns (string memory){
-        return _makeMessage(addr, uts, cID, tID, exp, lv, slot);
+        return _makeMessage(addr, uts, cID, tID, data);
     }
     /**
      * @dev verify signature function

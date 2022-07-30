@@ -89,18 +89,17 @@ describe(`${_name} TEST`, function () {
     }
     const ret = await Cont1.totalCollection();
     console.log(`        totalCollection : ${ret}`);
-    expect(ret).to.be.equal(259);
+    expect(ret).to.be.equal(256+3);
   });
 
   it("Get information of the collections", async function () { 
-    let cid, addr, serial, startId, maxSupply;
     let ret;
     for (let colid = 1; colid <= 3 ; colid++){
         ret = await ContAdmin.collection(colid);
-        [cid, addr, serial, startId, maxSupply] = ret;
-        expect(cid).to.be.equal(chainid[colid-1]);
-        expect(addr).to.be.equal(nfts[colid-1]);
-        console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId, maxSupply);
+        console.log(ret);
+        expect(ret.chainId).to.be.equal(chainid[colid-1]);
+        expect(ret.addr).to.be.equal(nfts[colid-1]);
+        console.log(`       CollectionID=${colid}:`, ret.chainId, ret.addr, ret.isSerial, ret.startId, ret.maxSupply);
     
     }
   });
@@ -111,13 +110,14 @@ describe(`${_name} TEST`, function () {
     const new_serial = true;
     const new_startId = 1;
     const new_supply = 1000;
+
     let ret = await ContAdmin.changeCollectionSupply(colid,new_serial,new_startId,new_supply);
     ret = await ContAdmin.collection(colid);
-    [cid, addr, serial, startId, maxSupply] = ret;
-    expect(serial).to.be.equal(new_serial);
+    [chainId, addr, isSerial, startId, maxSupply] = ret;
+    expect(isSerial).to.be.equal(new_serial);
     expect(startId).to.be.equal(new_startId);
     expect(maxSupply).to.be.equal(new_supply);
-    console.log(`       CollectionID=${colid}:`, cid.toNumber(), addr, serial, startId, maxSupply);
+    console.log(`       CollectionID=${colid}:`, chainId, addr, isSerial, startId, maxSupply);
   
   });
 
@@ -126,11 +126,12 @@ describe(`${_name} TEST`, function () {
     let tid = 1;
     let exp = 123242;
     let lv = 2;
-    let status = [10,23,45,35,23,66];
+    let slot = [10,23,45,35,23,66];
+    let data = {exp, lv, slot};
 
     let uts = helpers.Date2UnixTimestamp(new Date());
 
-    let ret = await Cont1.TEST_makeMessage(user1.address,uts, colid,tid,exp,lv,status);
+    let ret = await Cont1.TEST_makeMessage(user1.address,uts, colid,tid,data);
     let msg = helpers.Message
     (
       user1.address,
@@ -140,7 +141,7 @@ describe(`${_name} TEST`, function () {
       tid,
       exp,
       lv,
-      status
+      slot
     );
     console.log(`       Message:${ret}`)
     expect(ret).to.be.equal(msg);
@@ -151,7 +152,8 @@ describe(`${_name} TEST`, function () {
     let tid = 1;
     let exp = 123242;
     let lv = 2;
-    let status = [10,23,45,35,23,66];
+    let slot = [10,23,45,35,23,66];
+    let data = {exp:exp, lv:lv, slot:slot};
 
     let uts = helpers.Date2UnixTimestamp(new Date());
 
@@ -164,22 +166,20 @@ describe(`${_name} TEST`, function () {
       tid,
       exp,
       lv,
-      status
+      slot
     );
     let signature = await signer.signMessage(hashbytes);
 
-    let tx = await Cont1.setStatus(uts, colid, tid, exp, lv, status, signature);
-    let r_exp, r_lv, r_status;
+    let tx = await Cont1.setStatus(uts, colid, tid, data, signature);
     let ret = await Cont1.status(colid, tid);
-    [r_exp, r_lv, r_status] = ret;
-    expect(r_exp.toNumber()).to.be.equal(exp);
-    expect(r_lv).to.be.equal(lv);
-    let testStatus = status;
-    for (let i = status.length ; i < 11 ; i++){
-      testStatus.push(0);
+    expect(ret.exp.toNumber()).to.be.equal(exp);
+    expect(ret.lv).to.be.equal(lv);
+    let testSlot = slot;
+    for (let i = slot.length ; i < 11 ; i++){
+      testSlot.push(0);
     }
     // 配列を比較する場合、eqaulではなくeqlを使うとうまくいくらしい
-    expect(r_status).to.be.eql(testStatus);
+    expect(data.slot).to.be.eql(testSlot);
      
   });
 
@@ -234,7 +234,8 @@ describe(`${_name} TEST`, function () {
     let tid = 1;
     let exp = 123242;
     let lv = 2;
-    let status = [10,23,45,35,23,66];
+    let slot = [10,23,45,35,23,66];
+    let data = {exp, lv, slot};
     
     let uts = helpers.Date2UnixTimestamp(new Date());
 
@@ -249,17 +250,17 @@ describe(`${_name} TEST`, function () {
       tid,
       exp,
       lv,
-      status
+      slot
     );
     let signature = await signer.signMessage(hashbytes);
 
-    await expect(ContAdmin.setStatus(uts, colid, tid, exp, lv, status, signature)).to.be.revertedWith('CollectionIsDisable');
+    await expect(ContAdmin.setStatus(uts, colid, tid, data, signature)).to.be.revertedWith('CollectionIsDisable');
      
   });
   
 
   it("Revert test : Operate collection by non-admin user", async function(){
-    await expect(Cont1["addCollection(uint24,address,bool,uint24,uint24)"](chainid[0], nfts[0], true,1,100))
+    await expect(Cont1["addCollection(uint24,address)"](chainid[0], nfts[0]))
       .to.be.revertedWith('missing role');
     await expect(Cont2.changeCollectionSupply(1,true,12,56)).to.be.revertedWith('missing role');
   });

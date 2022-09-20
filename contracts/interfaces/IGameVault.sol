@@ -45,7 +45,7 @@ interface IGameVault{
     function status(uint128 cID, uint128 tID) external view returns(Status memory);
 
     function setStatus(
-        uint256 uts,
+        uint256 blockNumber,
         uint128 cID, 
         uint128 tID, 
         Status memory data,

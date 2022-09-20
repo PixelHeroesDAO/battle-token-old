@@ -128,7 +128,8 @@ contract GameVault is IGameVault, AccessControl{
 
     constructor (string memory ver_) {
         version = ver_;
-        _expireDuration = 5 minutes;
+        _expireDuration = 145; 
+        // 5 * 60 / 2.1 (divided by Average block time and modify last digit)
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);
@@ -395,7 +396,7 @@ contract GameVault is IGameVault, AccessControl{
      * @param signature Signed message by signer role accouunt.
      */ 
     function setStatus(
-        uint256 uts,
+        uint256 blockNumber,
         uint128 cID, 
         uint128 tID, 
         Status memory data,
@@ -404,8 +405,8 @@ contract GameVault is IGameVault, AccessControl{
     {
         _checkStatus(data);
         _checkDisable(cID);
-        _verifySigner(_makeMessage(msg.sender, uts, cID, tID, data), signature);
-        _verifyTimestamp(uts);
+        _verifySigner(_makeMessage(msg.sender, blockNumber, cID, tID, data), signature);
+        _verifyBlockNumber(blockNumber);
         _increaseNonce(msg.sender);
         _setStatus(cID, tID, data, true);
     }
@@ -441,15 +442,15 @@ contract GameVault is IGameVault, AccessControl{
      * @dev make message for sign to update status by user
      *   The message contains address of user, nonce of address, cID and tID
      *   with "|" separator. All parts are string.
-     * @param addr      EOA of user
-     * @param uts       Unix Timestamp
-     * @param cID       Collection ID
-     * @param tID       Token ID of collection
-     * @param data      Struct of status
+     * @param addr          EOA of user
+     * @param blockNumber   Current block number
+     * @param cID           Collection ID
+     * @param tID           Token ID of collection
+     * @param data      S   truct of status
      */
     function _makeMessage(
         address addr,
-        uint256 uts,
+        uint256 blockNumber,
         uint128 cID,
         uint128 tID,
         Status memory data
@@ -458,7 +459,7 @@ contract GameVault is IGameVault, AccessControl{
             "0x",
             addr.toAsciiString(), "|", 
             nonce[addr].toString(),  "|",
-            uts.toString(), "|",
+            blockNumber.toString(), "|",
             cID.toString(), "|",
             tID.toString(), "|",
             uint256(data.exp).toString(), "|",
@@ -477,12 +478,12 @@ contract GameVault is IGameVault, AccessControl{
 
     function TEST_makeMessage(
         address addr,
-        uint256 uts,
+        uint256 blockNumber,
         uint128 cID,
         uint128 tID,
         Status memory data
     )public view returns (string memory){
-        return _makeMessage(addr, uts, cID, tID, data);
+        return _makeMessage(addr, blockNumber, cID, tID, data);
     }
     /**
      * @dev verify signature function
@@ -496,9 +497,9 @@ contract GameVault is IGameVault, AccessControl{
         return true;
     }
 
-    function _verifyTimestamp(uint256 uts) internal view returns(bool){
-        if (uts + _expireDuration < block.timestamp) revert SignatureExpired();
-        console.log("chain stamp", block.timestamp, "test stamp", uts );
+    function _verifyBlockNumber(uint256 blockNumber) internal view returns(bool){
+        console.log("chain stamp", block.number, "test stamp", blockNumber );
+        if (blockNumber + _expireDuration < block.number) revert SignatureExpired();
         return true;
     }
 

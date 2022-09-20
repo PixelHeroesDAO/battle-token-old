@@ -30,23 +30,23 @@ contract PHBattleVault is GameVault, IPHBattleVault{
     }
 
     // Expのミントを実行。主にオフチェーンからのトークン移行時に使用し、専用のイベントを発行する。
-    function mintExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external override {
-        _changeExp(uts, cID, tID, dExp, true, signature, false);
+    function mintExp (uint256 blockNumber, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external override {
+        _changeExp(blockNumber, cID, tID, dExp, true, signature, false);
         emit MintExp(cID, tID, dExp);
     }
 
     // Expを増加させる。主に内部での処理を想定し、SetStatusイベントが発行される。
-    function increaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external override{
-        _changeExp(uts, cID, tID, dExp, true, signature, true);
+    function increaseExp (uint256 blockNumber, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external override{
+        _changeExp(blockNumber, cID, tID, dExp, true, signature, true);
     }
 
     // Expを減少させる。主に内部での処理を想定し、SetStatusイベントが発行される。
-    function decreaseExp (uint256 uts, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external override{
-        _changeExp(uts, cID, tID, dExp, false, signature, true);
+    function decreaseExp (uint256 blockNumber, uint128 cID, uint128 tID, uint64 dExp, bytes memory signature) external override{
+        _changeExp(blockNumber, cID, tID, dExp, false, signature, true);
     }
 
     function _changeExp (
-        uint256 uts, 
+        uint256 blockNumber, 
         uint128 cID, 
         uint128 tID, 
         uint64 dExp, 
@@ -65,8 +65,8 @@ contract PHBattleVault is GameVault, IPHBattleVault{
         }
         _checkStatus(data);
         _checkDisable(cID);
-        _verifySigner(_makeMsgExp(msg.sender, uts, cID, tID, dExp, inc), signature);
-        _verifyTimestamp(uts);
+        _verifySigner(_makeMsgExp(msg.sender, blockNumber, cID, tID, dExp, inc), signature);
+        _verifyBlockNumber(blockNumber);
         _increaseNonce(msg.sender);
         _setStatus(cID, tID, data, emitSetStatusEvent);
 
@@ -85,7 +85,7 @@ contract PHBattleVault is GameVault, IPHBattleVault{
      */
     function _makeMsgExp(
         address addr,
-        uint256 uts,
+        uint256 blockNumber,
         uint128 cID,
         uint128 tID,
         uint64 dExp, 
@@ -101,7 +101,7 @@ contract PHBattleVault is GameVault, IPHBattleVault{
             "0x",
             addr.toAsciiString(), "|", 
             nonce[addr].toString(),  "|",
-            uts.toString(), "|",
+            blockNumber.toString(), "|",
             cID.toString(), "|",
             tID.toString(), "|",
             sgn, uint256(dExp).toString()
